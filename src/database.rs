@@ -167,14 +167,14 @@ pub trait TableDesc {
     type Columns;
 }
 
-pub trait TableAccess<'a, T: TableDesc> {
-    fn get_table(&self) -> &Table<'a, T>;
+pub trait TableAccess<'db, T: TableDesc> {
+    fn get_table(&self) -> &Table<'db, T>;
 }
 
 macro_rules! impl_table_access {
     ( $tab:ident ) => {
-        impl<'a> TableAccess<'a, schema::$tab> for Tables<'a> {
-            fn get_table(&self) -> &Table<'a, schema::$tab> {
+        impl<'db> TableAccess<'db, schema::$tab> for Tables<'db> {
+            fn get_table(&self) -> &Table<'db, schema::$tab> {
                 &self.$tab
             }
         }
@@ -222,50 +222,50 @@ impl_table_access!(MethodSpec);
 
 #[allow(non_snake_case)]
 #[derive(Default)]
-pub struct Tables<'a> {
-    TypeRef: Table<'a, schema::TypeRef>,
-    GenericParamConstraint: Table<'a, schema::GenericParamConstraint>,
-    TypeSpec: Table<'a, schema::TypeSpec>,
-    TypeDef: Table<'a, schema::TypeDef>,
-    CustomAttribute: Table<'a, schema::CustomAttribute>,
-    MethodDef: Table<'a, schema::MethodDef>,
-    MemberRef: Table<'a, schema::MemberRef>,
-    Module: Table<'a, schema::Module>,
-    Param: Table<'a, schema::Param>,
-    InterfaceImpl: Table<'a, schema::InterfaceImpl>,
-    Constant: Table<'a, schema::Constant>,
-    Field: Table<'a, schema::Field>,
-    FieldMarshal: Table<'a, schema::FieldMarshal>,
-    DeclSecurity: Table<'a, schema::DeclSecurity>,
-    ClassLayout: Table<'a, schema::ClassLayout>,
-    FieldLayout: Table<'a, schema::FieldLayout>,
-    StandAloneSig: Table<'a, schema::StandAloneSig>,
-    EventMap: Table<'a, schema::EventMap>,
-    Event: Table<'a, schema::Event>,
-    PropertyMap: Table<'a, schema::PropertyMap>,
-    Property: Table<'a, schema::Property>,
-    MethodSemantics: Table<'a, schema::MethodSemantics>,
-    MethodImpl: Table<'a, schema::MethodImpl>,
-    ModuleRef: Table<'a, schema::ModuleRef>,
-    ImplMap: Table<'a, schema::ImplMap>,
-    FieldRVA: Table<'a, schema::FieldRVA>,
-    Assembly: Table<'a, schema::Assembly>,
-    AssemblyProcessor: Table<'a, schema::AssemblyProcessor>,
-    AssemblyOS: Table<'a, schema::AssemblyOS>,
-    AssemblyRef: Table<'a, schema::AssemblyRef>,
-    AssemblyRefProcessor: Table<'a, schema::AssemblyRefProcessor>,
-    AssemblyRefOS: Table<'a, schema::AssemblyRefOS>,
-    File: Table<'a, schema::File>,
-    ExportedType: Table<'a, schema::ExportedType>,
-    ManifestResource: Table<'a, schema::ManifestResource>,
-    NestedClass: Table<'a, schema::NestedClass>,
-    GenericParam: Table<'a, schema::GenericParam>,
-    MethodSpec: Table<'a, schema::MethodSpec>,
+pub struct Tables<'db> {
+    TypeRef: Table<'db, schema::TypeRef>,
+    GenericParamConstraint: Table<'db, schema::GenericParamConstraint>,
+    TypeSpec: Table<'db, schema::TypeSpec>,
+    TypeDef: Table<'db, schema::TypeDef>,
+    CustomAttribute: Table<'db, schema::CustomAttribute>,
+    MethodDef: Table<'db, schema::MethodDef>,
+    MemberRef: Table<'db, schema::MemberRef>,
+    Module: Table<'db, schema::Module>,
+    Param: Table<'db, schema::Param>,
+    InterfaceImpl: Table<'db, schema::InterfaceImpl>,
+    Constant: Table<'db, schema::Constant>,
+    Field: Table<'db, schema::Field>,
+    FieldMarshal: Table<'db, schema::FieldMarshal>,
+    DeclSecurity: Table<'db, schema::DeclSecurity>,
+    ClassLayout: Table<'db, schema::ClassLayout>,
+    FieldLayout: Table<'db, schema::FieldLayout>,
+    StandAloneSig: Table<'db, schema::StandAloneSig>,
+    EventMap: Table<'db, schema::EventMap>,
+    Event: Table<'db, schema::Event>,
+    PropertyMap: Table<'db, schema::PropertyMap>,
+    Property: Table<'db, schema::Property>,
+    MethodSemantics: Table<'db, schema::MethodSemantics>,
+    MethodImpl: Table<'db, schema::MethodImpl>,
+    ModuleRef: Table<'db, schema::ModuleRef>,
+    ImplMap: Table<'db, schema::ImplMap>,
+    FieldRVA: Table<'db, schema::FieldRVA>,
+    Assembly: Table<'db, schema::Assembly>,
+    AssemblyProcessor: Table<'db, schema::AssemblyProcessor>,
+    AssemblyOS: Table<'db, schema::AssemblyOS>,
+    AssemblyRef: Table<'db, schema::AssemblyRef>,
+    AssemblyRefProcessor: Table<'db, schema::AssemblyRefProcessor>,
+    AssemblyRefOS: Table<'db, schema::AssemblyRefOS>,
+    File: Table<'db, schema::File>,
+    ExportedType: Table<'db, schema::ExportedType>,
+    ManifestResource: Table<'db, schema::ManifestResource>,
+    NestedClass: Table<'db, schema::NestedClass>,
+    GenericParam: Table<'db, schema::GenericParam>,
+    MethodSpec: Table<'db, schema::MethodSpec>,
 }
 
-impl<'a> Tables<'a> {
-    pub fn get_table<T: TableDesc>(&self) -> &Table<'a, T> where Self: TableAccess<'a, T> {
-        <Self as TableAccess<'a, T>>::get_table(self)
+impl<'db> Tables<'db> {
+    pub fn get_table<T: TableDesc>(&self) -> &Table<'db, T> where Self: TableAccess<'db, T> {
+        <Self as TableAccess<'db, T>>::get_table(self)
     }
 }
 
@@ -280,12 +280,12 @@ pub(crate) trait CodedIndex : Sized {
     }
 }
 
-pub struct Database<'a> {
-    m_view: &'a [u8],
-    m_strings: &'a [u8],
-    m_blobs: &'a [u8],
-    m_guids: &'a [u8],
-    pub(crate) m_tables: Tables<'a>
+pub struct Database<'db> {
+    m_view: &'db [u8],
+    m_strings: &'db [u8],
+    m_blobs: &'db [u8],
+    m_guids: &'db [u8],
+    pub(crate) m_tables: Tables<'db>
 }
 
 pub fn is_database<P: AsRef<Path>>(path: P) -> io::Result<bool> {
@@ -363,8 +363,8 @@ pub fn mmap_file<P: AsRef<Path>>(path: P) -> io::Result<Mmap> {
     unsafe { MmapOptions::new().map(&file) }
 }
 
-impl<'a> Database<'a> {
-    pub fn load(data: &'a [u8]) -> Result<Database<'a>> {
+impl<'db> Database<'db> {
+    pub fn load(data: &'db [u8]) -> Result<Database<'db>> {
 
         let m_view = data;
 
@@ -622,8 +622,8 @@ impl<'a> Database<'a> {
         })
     }
 
-    pub fn get_table<T: TableDesc>(&self) -> &Table<'a, T>
-        where Tables<'a>: TableAccess<'a, T>
+    pub fn get_table<T: TableDesc>(&self) -> &Table<'db, T>
+        where Tables<'db>: TableAccess<'db, T>
     {
         self.m_tables.get_table::<T>()
     }

@@ -19,15 +19,15 @@ impl<T: TableDesc, Col: ColumnIndex> ColumnAccess<Col> for T
     type ColumnSize = <<T as TableDesc>::Columns as ColumnTupleAccess<Col>>::Out;
 }
 
-pub struct Table<'a, T: TableDesc> {
+pub struct Table<'db, T: TableDesc> {
     p: std::marker::PhantomData<T>,
     m_row_count: u32,
     m_row_size: u8,
     m_columns: [Column; 6],
-    m_data: Option<&'a [u8]>,
+    m_data: Option<&'db [u8]>,
 }
 
-impl<'a, T: TableDesc> Table<'a, T> {
+impl<'db, T: TableDesc> Table<'db, T> {
     pub(crate) fn set_columns<Tuple>(self: &mut Self, tup: Tuple) where T: TableDesc<Columns=Tuple>, Tuple: ColumnTuple {
         assert!(self.m_row_size == 0);
         self.m_row_size = tup.row_size();
@@ -43,7 +43,7 @@ impl<'a, T: TableDesc> Table<'a, T> {
         self.m_row_count
     }
 
-    pub fn iter(&'a self) -> TableRowIterator<'a, T> {
+    pub fn iter(&'db self) -> TableRowIterator<'db, T> {
         self.into_iter()
     }
 
@@ -51,7 +51,7 @@ impl<'a, T: TableDesc> Table<'a, T> {
         if self.m_row_count < (1 << 16) { DynamicSize::Size2 } else { DynamicSize::Size4 }
     }
 
-    pub(crate) fn set_data(self: &mut Self, view: &'a [u8]) -> &'a [u8] {
+    pub(crate) fn set_data(self: &mut Self, view: &'db [u8]) -> &'db [u8] {
         assert!(self.m_data.is_none());
 
         if self.m_row_count > 0 {
@@ -88,7 +88,7 @@ impl<'a, T: TableDesc> Table<'a, T> {
     }
 }
 
-impl<'a, T: TableDesc> Default for Table<'a, T> where <T as TableDesc>::Columns: Default {
+impl<'db, T: TableDesc> Default for Table<'db, T> where <T as TableDesc>::Columns: Default {
    fn default() -> Self {
         Table {
             p: ::std::marker::PhantomData,
@@ -100,9 +100,9 @@ impl<'a, T: TableDesc> Default for Table<'a, T> where <T as TableDesc>::Columns:
     }
 }
 
-impl<'t, T: TableDesc> IntoIterator for &'t Table<'t, T> {
-    type Item = TableRow<'t, T>;
-    type IntoIter = TableRowIterator<'t, T>;
+impl<'db, T: TableDesc> IntoIterator for &'db Table<'db, T> {
+    type Item = TableRow<'db, T>;
+    type IntoIter = TableRowIterator<'db, T>;
 
     fn into_iter(self) -> Self::IntoIter {
         TableRowIterator {
@@ -113,19 +113,19 @@ impl<'t, T: TableDesc> IntoIterator for &'t Table<'t, T> {
     }
 }
 
-pub struct TableRow<'t, T: TableDesc> {
-    m_table: &'t Table<'t, T>,
+pub struct TableRow<'db, T: TableDesc> {
+    m_table: &'db Table<'db, T>,
     m_row: u32,
 }
 
-pub struct TableRowIterator<'t, T: TableDesc> {
-    m_table: &'t Table<'t, T>,
+pub struct TableRowIterator<'db, T: TableDesc> {
+    m_table: &'db Table<'db, T>,
     m_row: u32, // the next row to yield
     m_end: u32, // end of this iterator's range (exclusive)
 }
 
-impl<'t, T: TableDesc> Iterator for TableRowIterator<'t, T> {
-    type Item = TableRow<'t, T>;
+impl<'db, T: TableDesc> Iterator for TableRowIterator<'db, T> {
+    type Item = TableRow<'db, T>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.m_row < self.m_end {
@@ -166,7 +166,7 @@ impl<'t, T: TableDesc> Iterator for TableRowIterator<'t, T> {
     }
 }
 
-impl<'t, T: TableDesc> TableRow<'t, T> {
+impl<'db, T: TableDesc> TableRow<'db, T> {
     pub fn index(&self) -> u32 { self.m_row }
 
     pub(crate) fn get_value<Col: ColumnIndex, V>(&self) -> Result<V>
@@ -175,13 +175,13 @@ impl<'t, T: TableDesc> TableRow<'t, T> {
         self.m_table.get_value::<Col, _>(self.m_row)
     }
 
-    pub(crate) fn get_string<'db, Col: ColumnIndex>(&self, db: &'db Database) -> Result<&'db str>
+    pub(crate) fn get_string<Col: ColumnIndex>(&self, db: &'db Database) -> Result<&'db str>
         where T: ColumnAccess<Col>, u32: ReadValue<<T as ColumnAccess<Col>>::ColumnSize>
     {
         db.get_string(self.get_value::<Col, _>()?)
     }
 
-    pub(crate) fn get_blob<'db, Col: ColumnIndex>(&self, db: &'db Database) -> Result<&'db [u8]>
+    pub(crate) fn get_blob<Col: ColumnIndex>(&self, db: &'db Database) -> Result<&'db [u8]>
         where T: ColumnAccess<Col>, u32: ReadValue<<T as ColumnAccess<Col>>::ColumnSize>
     {
         db.get_blob(self.get_value::<Col, _>()?)
@@ -193,8 +193,8 @@ impl<'t, T: TableDesc> TableRow<'t, T> {
         Target::decode(self.get_value::<Col, _>()?, db)
     }
 
-    pub(crate) fn get_list<Col: ColumnIndex, Target: TableDesc>(&self, db: &'t Database<'t>) -> Result<TableRowIterator<'t, Target>>
-        where database::Tables<'t>: database::TableAccess<'t, Target>,
+    pub(crate) fn get_list<Col: ColumnIndex, Target: TableDesc>(&self, db: &'db Database<'db>) -> Result<TableRowIterator<'db, Target>>
+        where database::Tables<'db>: database::TableAccess<'db, Target>,
               T: ColumnAccess<Col>, u32: ReadValue<<T as ColumnAccess<Col>>::ColumnSize>
     {
         let target_table = db.get_table::<Target>();
@@ -218,8 +218,8 @@ impl<'t, T: TableDesc> TableRow<'t, T> {
         })
     }
 
-    pub(crate) fn get_target_row<Col: ColumnIndex, Target: TableDesc>(&self, tables: &'t database::Tables<'t>)  -> Result<TableRow<'t, Target>>
-        where database::Tables<'t>: database::TableAccess<'t, Target>,
+    pub(crate) fn get_target_row<Col: ColumnIndex, Target: TableDesc>(&self, tables: &'db database::Tables<'db>)  -> Result<TableRow<'db, Target>>
+        where database::Tables<'db>: database::TableAccess<'db, Target>,
               T: ColumnAccess<Col>, u32: ReadValue<<T as ColumnAccess<Col>>::ColumnSize>
     {
         let target_table = tables.get_table::<Target>();

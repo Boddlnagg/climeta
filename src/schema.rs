@@ -346,7 +346,7 @@ pub enum ConstantType {
 }
 
 #[derive(Debug, Copy, Clone)]
-pub enum ConstantValue<'a> {
+pub enum ConstantValue<'db> {
     Boolean(bool),
     Char(u16),
     Int8(i8),
@@ -359,7 +359,7 @@ pub enum ConstantValue<'a> {
     UInt64(u64),
     Float32(f32),
     Float64(f64),
-    String(Option<&'a str>),
+    String(Option<&'db str>),
     Class
 }
 
