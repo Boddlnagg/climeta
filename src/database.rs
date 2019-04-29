@@ -281,6 +281,7 @@ pub struct Database<'a> {
     m_strings: &'a [u8],
     m_blobs: &'a [u8],
     m_guids: &'a [u8],
+    pub(crate) m_tables: Tables<'a>
 }
 
 pub fn is_database<P: AsRef<Path>>(path: P) -> io::Result<bool> {
@@ -359,7 +360,7 @@ pub fn mmap_file<P: AsRef<Path>>(path: P) -> io::Result<Mmap> {
 }
 
 impl<'a> Database<'a> {
-    pub fn load(data: &'a [u8]) -> Result<(Database<'a>, Tables<'a>)> {
+    pub fn load(data: &'a [u8]) -> Result<Database<'a>> {
 
         let m_view = data;
 
@@ -608,12 +609,19 @@ impl<'a> Database<'a> {
         view = t.MethodSpec.set_data(view);
         t.GenericParamConstraint.set_data(view);
 
-        Ok((Database {
+        Ok(Database {
             m_view: data,
             m_strings,
             m_blobs,
             m_guids,
-        }, t))
+            m_tables: t
+        })
+    }
+
+    pub fn get_table<T: TableDesc>(&self) -> &Table<'a, T>
+        where Tables<'a>: TableAccess<'a, T>
+    {
+        self.m_tables.get_table::<T>()
     }
 
     pub(crate) fn get_string(&self, index: u32) -> Result<&str> {
