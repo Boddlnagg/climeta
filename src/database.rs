@@ -268,8 +268,10 @@ impl<'a> Tables<'a> {
 }
 
 pub(crate) trait CodedIndex : Sized {
+    type Database;
     type Tables;
-    fn decode(idx: u32, tables: Self::Tables) -> Result<Option<Self>>;
+
+    fn decode(idx: u32, tables: Self::Database) -> Result<Option<Self>>;
     fn index_size(tables: Self::Tables) -> DynamicSize;
     fn needs_4byte_index(row_count: u32, tag_bits: u8) -> bool {
         row_count >= (1u32 << (16 - tag_bits))

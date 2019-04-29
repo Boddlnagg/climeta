@@ -168,17 +168,17 @@ impl<'t, T: TableDesc> TableRow<'t, T> {
         db.get_blob(self.get_value::<Col, _>()?)
     }
 
-    pub(crate) fn get_coded_index<Col: ColumnIndex, Target: database::CodedIndex>(&self, tables: Target::Tables) -> Result<Option<Target>>
+    pub(crate) fn get_coded_index<Col: ColumnIndex, Target: database::CodedIndex>(&self, db: Target::Database) -> Result<Option<Target>>
         where T: ColumnAccess<Col>, u32: ReadValue<<T as ColumnAccess<Col>>::ColumnSize>
     {
-        Target::decode(self.get_value::<Col, _>()?, tables)
+        Target::decode(self.get_value::<Col, _>()?, db)
     }
 
-    pub(crate) fn get_list<Col: ColumnIndex, Target: TableDesc>(&self, tables: &'t database::Tables<'t>) -> Result<TableRowIterator<'t, Target>>
+    pub(crate) fn get_list<Col: ColumnIndex, Target: TableDesc>(&self, db: &'t Database<'t>) -> Result<TableRowIterator<'t, Target>>
         where database::Tables<'t>: database::TableAccess<'t, Target>,
               T: ColumnAccess<Col>, u32: ReadValue<<T as ColumnAccess<Col>>::ColumnSize>
     {
-        let target_table = tables.get_table::<Target>();
+        let target_table = db.get_table::<Target>();
         let first = self.get_value::<Col, u32>()?;
         assert!(first != 0);
         let first = first - 1;
