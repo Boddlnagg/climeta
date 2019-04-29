@@ -1,36 +1,46 @@
 use climeta::{database, schema};
 
+fn print_typedef(row: &database::TableRow<schema::TypeDef>, db: &database::Database) -> Result<(), Box<std::error::Error>> {
+    println!("{}.{}", row.type_namespace(&db)?, row.type_name(&db)?);
+
+    for md in row.method_list(&db)? {
+        println!(" M {}", md.name(&db)?);
+        for mpar in md.param_list(&db)? {
+            println!("   P {} {}", mpar.sequence()?, mpar.name(&db)?);
+        }
+    }
+    // for fld in row.field_list(&db)? {
+    //     println!(" F {}", fld.name(&db)?);
+    // }
+
+    match row.extends(&db)? {
+        None => println!(" Extends: <None>"),
+        Some(schema::TypeDefOrRef::TypeDef(def)) => {
+            println!(" Extends: {}.{} (def)", def.type_namespace(&db)?, def.type_name(&db)?);
+        },
+        Some(schema::TypeDefOrRef::TypeRef(def)) => {
+            println!(" Extends: {}.{} (ref: {:?}) ", def.type_namespace(&db)?, def.type_name(&db)?, def.resolution_scope(&db)?);
+        },
+        _ => ()
+    }
+
+    Ok(())
+}
+
 fn main() -> Result<(), Box<std::error::Error>> {
     println!("=== Windows.Foundation.winmd ===");
     let f1 = database::mmap_file("C:\\Windows\\System32\\WinMetadata\\Windows.Foundation.winmd").unwrap();
     let db = database::Database::load(&f1).unwrap();
     let typedefs = db.get_table::<schema::TypeDef>();
     for row in typedefs {
-        println!("{}.{}", row.type_namespace(&db)?, row.type_name(&db)?);
-
-        
-        for md in row.method_list(&db)? {
-            println!(" M {}", md.name(&db)?);
-            for mpar in md.param_list(&db)? {
-                println!("   P {} {}", mpar.sequence()?, mpar.name(&db)?);
-            }
-        }
-        // for fld in row.field_list(&db)? {
-        //     println!(" F {}", fld.name(&db)?);
-        // }
-
-        match row.extends(&db)? {
-            None => println!(" Extends: <None>"),
-            Some(schema::TypeDefOrRef::TypeDef(def)) => {
-                println!(" Extends: {}.{} (def)", def.type_namespace(&db)?, def.type_name(&db)?);
-            },
-            Some(schema::TypeDefOrRef::TypeRef(def)) => {
-                println!(" Extends: {}.{} (ref: {:?}) ", def.type_namespace(&db)?, def.type_name(&db)?, def.resolution_scope(&db)?);
-            },
-            _ => ()
-        }
+        print_typedef(&row, &db)?;
     }
-    println!("TOTAL: {} == {}", typedefs.size(), typedefs.into_iter().count());
+    for i in 0..typedefs.size() {
+        println!("== {} ==", i);
+        print_typedef(&typedefs.get_row(i)?, &db)?;
+        print_typedef(&typedefs.iter().nth(i as usize).unwrap(), &db)?;
+    }
+    println!("TOTAL: {} == {}", typedefs.size(), typedefs.iter().count());
 
     // for cons in db.get_table::<schema::Constant>() {
     //     let parent = cons.parent(&db)?;

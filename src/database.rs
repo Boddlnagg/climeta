@@ -7,9 +7,11 @@ use byteorder::{ByteOrder, LittleEndian};
 use memmap::{MmapOptions, Mmap};
 
 use crate::{pe, schema};
-use crate::table::{Table, Column};
+use crate::table::Column;
 use crate::Result;
 use crate::ByteView;
+
+pub use crate::table::{Table, TableRow};
 
 pub(crate) trait ReadValue<S: ColumnSize> {
     fn read_value(input: &[u8], size: u8) -> Self;

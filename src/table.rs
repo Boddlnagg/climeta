@@ -39,9 +39,12 @@ impl<'a, T: TableDesc> Table<'a, T> {
         self.m_row_count = count;
     }
 
-    // TODO: off by one?
     pub fn size(&self) -> u32 {
         self.m_row_count
+    }
+
+    pub fn iter(&'a self) -> TableRowIterator<'a, T> {
+        self.into_iter()
     }
 
     pub(crate) fn index_size(&self) -> DynamicSize {
@@ -144,6 +147,22 @@ impl<'t, T: TableDesc> Iterator for TableRowIterator<'t, T> {
 
     fn count(self) -> usize {
         self.m_end as usize - self.m_row as usize
+    }
+
+    fn last(self) -> Option<Self::Item> {
+        if self.m_row < self.m_end {
+            Some(self.m_table.get_row(self.m_end - 1).expect("index must be valid"))
+        } else {
+            None
+        }
+    }
+
+    fn nth(&mut self, n: usize) -> Option<Self::Item> {
+        if self.m_row + (n as u32) < self.m_end {
+            Some(self.m_table.get_row(self.m_row + (n as u32)).expect("index must be valid"))
+        } else {
+            None
+        }
     }
 }
 
