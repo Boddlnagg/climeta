@@ -162,12 +162,12 @@ impl TableDesc for TypeSpec {
 
 macro_rules! coded_index {
     ($name:ident[$bits:tt] { $($n:tt => $ty:ident),+ }) => {
-        pub enum $name<'t, 'b> {
-            $($ty(TableRow<'t, 'b, $ty>)),+
+        pub enum $name<'t> {
+            $($ty(TableRow<'t, $ty>)),+
         }
 
-        impl<'t: 'b, 'b> CodedIndex for $name<'t, 'b> {
-            type Tables = &'b Tables<'t>;
+        impl<'t> CodedIndex for $name<'t> {
+            type Tables = &'t Tables<'t>;
             fn decode(idx: u32, tables: Self::Tables) -> Result<Option<Self>> {
                 let tag = idx & ((1 << $bits) - 1);
                 let row = idx >> $bits as u32;
@@ -190,7 +190,7 @@ macro_rules! coded_index {
             }
         }
 
-        impl <'t: 'b, 'b> std::fmt::Debug for $name<'t, 'b> {
+        impl <'t: 'b, 'b> std::fmt::Debug for $name<'t> {
             fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
                 match self {
                     $($name::$ty(_) => write!(f, "{}::{}", stringify!($name), stringify!($ty))),+
@@ -414,34 +414,34 @@ enum ElementType {
     Enum = 0x55, // Custom attribute enum
 }
 
-impl<'t, 'b> TableRow<'t, 'b, AssemblyRef> {
-    pub fn public_key_or_token(&self, db: &'t Database) -> Result<&'t [u8]> {
+impl<'t> TableRow<'t, AssemblyRef> {
+    pub fn public_key_or_token(&self, db: &'t Database<'t>) -> Result<&'t [u8]> {
         self.get_blob::<Col2>(db)
     }
 
-    pub fn name(&self, db: &'t Database) -> Result<&'t str> {
+    pub fn name(&self, db: &'t Database<'t>) -> Result<&'t str> {
         self.get_string::<Col3>(db)
     }
 
-    pub fn culture(&self, db: &'t Database) -> Result<&'t str> {
+    pub fn culture(&self, db: &'t Database<'t>) -> Result<&'t str> {
         self.get_string::<Col4>(db)
     }
 
-    pub fn hash_value(&self, db: &'t Database) -> Result<&'t str> {
+    pub fn hash_value(&self, db: &'t Database<'t>) -> Result<&'t str> {
         self.get_string::<Col5>(db)
     }
 }
 
-impl<'t, 'b> TableRow<'t, 'b, Constant> {
+impl<'t> TableRow<'t, Constant> {
     pub fn typ(&self) -> Result<ConstantType> {
         <ConstantType as FromPrimitive>::from_u16(self.get_value::<Col0, _>()?).ok_or_else(|| "Invalid ConstantType".into())
     }
 
-    pub fn parent(&self, db: &'t Database) -> Result<Option<HasConstant<'t, 'b>>> {
+    pub fn parent(&self, db: &'t Database<'t>) -> Result<Option<HasConstant<'t>>> {
         self.get_coded_index::<Col1, HasConstant>(&db.m_tables)
     }
 
-    pub fn value(&self, db: &'t Database) -> Result<ConstantValue> {
+    pub fn value(&self, db: &'t Database<'t>) -> Result<ConstantValue> {
         use ConstantValue::*;
         let bytes = self.get_blob::<Col2>(db)?;
         Ok(match self.typ()? {
@@ -472,68 +472,68 @@ impl<'t, 'b> TableRow<'t, 'b, Constant> {
     }
 }
 
-impl<'t, 'b> TableRow<'t, 'b, Field> {
-    pub fn name(&self, db: &'t Database) -> Result<&'t str> {
+impl<'t> TableRow<'t, Field> {
+    pub fn name(&self, db: &'t Database<'t>) -> Result<&'t str> {
         self.get_string::<Col1>(db)
     }
 }
 
-impl<'t, 'b> TableRow<'t, 'b, MethodDef> {
+impl<'t> TableRow<'t, MethodDef> {
     pub fn rva(&self) -> Result<u32> {
         self.get_value::<Col0, _>()
     }
 
-    pub fn name(&self, db: &'t Database) -> Result<&'t str> {
+    pub fn name(&self, db: &'t Database<'t>) -> Result<&'t str> {
         self.get_string::<Col3>(db)
     }
 
-    pub fn param_list<'x>(&'x self, db: &'t Database) -> Result<TableRowIterator<'t, 'x, Param>> {
+    pub fn param_list(&self, db: &'t Database<'t>) -> Result<TableRowIterator<'t, Param>> {
         self.get_list::<Col5, Param>(&db.m_tables)
     }
 }
 
-impl<'t, 'b> TableRow<'t, 'b, Param> {
+impl<'t> TableRow<'t, Param> {
     pub fn sequence(&self) -> Result<u16> {
         self.get_value::<Col1, u16>()
     }
 
-    pub fn name(&self, db: &'t Database) -> Result<&'t str> {
+    pub fn name(&self, db: &'t Database<'t>) -> Result<&'t str> {
         self.get_string::<Col2>(db)
     }
 }
 
-impl<'t, 'b> TableRow<'t, 'b, TypeDef> {
-    pub fn type_name(&self, db: &'t Database) -> Result<&'t str> {
+impl<'t> TableRow<'t, TypeDef> {
+    pub fn type_name(&self, db: &'t Database<'t>) -> Result<&'t str> {
         self.get_string::<Col1>(db)
     }
 
-    pub fn type_namespace(&self, db: &'t Database) -> Result<&'t str> {
+    pub fn type_namespace(&self, db: &'t Database<'t>) -> Result<&'t str> {
         self.get_string::<Col2>(db)
     }
 
-    pub fn extends(&self, db: &'t Database) -> Result<Option<TypeDefOrRef<'t, 'b>>> {
+    pub fn extends(&self, db: &'t Database<'t>) -> Result<Option<TypeDefOrRef<'t>>> {
         self.get_coded_index::<Col3, TypeDefOrRef>(&db.m_tables)
     }
 
-    pub fn field_list<'x>(&'x self, db: &'t Database) -> Result<TableRowIterator<'t, 'x, Field>> {
+    pub fn field_list(&self, db: &'t Database<'t>) -> Result<TableRowIterator<'t, Field>> {
         self.get_list::<Col4, Field>(&db.m_tables)
     }
 
-    pub fn method_list<'x>(&'x self, db: &'t Database) -> Result<TableRowIterator<'t, 'x, MethodDef>> {
+    pub fn method_list(&self, db: &'t Database<'t>) -> Result<TableRowIterator<'t, MethodDef>> {
         self.get_list::<Col5, MethodDef>(&db.m_tables)
     }
 }
 
-impl<'t, 'b> TableRow<'t, 'b, TypeRef> {
-    pub fn resolution_scope(&self, db: &'t Database) -> Result<Option<ResolutionScope<'t, 'b>>> {
+impl<'t> TableRow<'t, TypeRef> {
+    pub fn resolution_scope(&self, db: &'t Database<'t>) -> Result<Option<ResolutionScope<'t>>> {
         self.get_coded_index::<Col0, ResolutionScope>(&db.m_tables)
     }
 
-    pub fn type_name(&self, db: &'t Database) -> Result<&'t str> {
+    pub fn type_name(&self, db: &'t Database<'t>) -> Result<&'t str> {
         self.get_string::<Col1>(db)
     }
 
-    pub fn type_namespace(&self, db: &'t Database) -> Result<&'t str> {
+    pub fn type_namespace(&self, db: &'t Database<'t>) -> Result<&'t str> {
         self.get_string::<Col2>(db)
     }
 }
