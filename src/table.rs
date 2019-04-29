@@ -65,7 +65,7 @@ impl<'db, T: TableDesc> Table<'db, T> {
     }
 
     pub(crate) fn get_value<Col: ColumnIndex, V>(&self, row: u32) -> Result<V>
-        where T: ColumnAccess<Col>, V: ReadValue<<T as ColumnAccess<Col>>::ColumnSize>
+        where T: ColumnAccess<Col>, V: ReadValue<T::ColumnSize>
     {
         let data_size = self.m_columns[Col::idx()].size;
 
@@ -170,32 +170,32 @@ impl<'db, T: TableDesc> TableRow<'db, T> {
     pub fn index(&self) -> u32 { self.m_row }
 
     pub(crate) fn get_value<Col: ColumnIndex, V>(&self) -> Result<V>
-        where T: ColumnAccess<Col>, V: ReadValue<<T as ColumnAccess<Col>>::ColumnSize>
+        where T: ColumnAccess<Col>, V: ReadValue<T::ColumnSize>
     {
         self.m_table.get_value::<Col, _>(self.m_row)
     }
 
     pub(crate) fn get_string<Col: ColumnIndex>(&self, db: &'db Database) -> Result<&'db str>
-        where T: ColumnAccess<Col>, u32: ReadValue<<T as ColumnAccess<Col>>::ColumnSize>
+        where T: ColumnAccess<Col>, u32: ReadValue<T::ColumnSize>
     {
         db.get_string(self.get_value::<Col, _>()?)
     }
 
     pub(crate) fn get_blob<Col: ColumnIndex>(&self, db: &'db Database) -> Result<&'db [u8]>
-        where T: ColumnAccess<Col>, u32: ReadValue<<T as ColumnAccess<Col>>::ColumnSize>
+        where T: ColumnAccess<Col>, u32: ReadValue<T::ColumnSize>
     {
         db.get_blob(self.get_value::<Col, _>()?)
     }
 
     pub(crate) fn get_coded_index<Col: ColumnIndex, Target: database::CodedIndex>(&self, db: Target::Database) -> Result<Option<Target>>
-        where T: ColumnAccess<Col>, u32: ReadValue<<T as ColumnAccess<Col>>::ColumnSize>
+        where T: ColumnAccess<Col>, u32: ReadValue<T::ColumnSize>
     {
         Target::decode(self.get_value::<Col, _>()?, db)
     }
 
     pub(crate) fn get_list<Col: ColumnIndex, Target: TableDesc>(&self, db: &'db Database<'db>) -> Result<TableRowIterator<'db, Target>>
         where database::Tables<'db>: database::TableAccess<'db, Target>,
-              T: ColumnAccess<Col>, u32: ReadValue<<T as ColumnAccess<Col>>::ColumnSize>
+              T: ColumnAccess<Col>, u32: ReadValue<T::ColumnSize>
     {
         let target_table = db.get_table::<Target>();
         let first = self.get_value::<Col, u32>()?;
@@ -220,7 +220,7 @@ impl<'db, T: TableDesc> TableRow<'db, T> {
 
     pub(crate) fn get_target_row<Col: ColumnIndex, Target: TableDesc>(&self, tables: &'db database::Tables<'db>)  -> Result<TableRow<'db, Target>>
         where database::Tables<'db>: database::TableAccess<'db, Target>,
-              T: ColumnAccess<Col>, u32: ReadValue<<T as ColumnAccess<Col>>::ColumnSize>
+              T: ColumnAccess<Col>, u32: ReadValue<T::ColumnSize>
     {
         let target_table = tables.get_table::<Target>();
         let row = self.get_value::<Col, u32>()?;
