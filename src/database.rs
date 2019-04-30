@@ -231,14 +231,14 @@ pub struct TableInfo<'db, T: TableDesc> {
 }
 
 impl<'db, T: TableDesc> TableInfo<'db, T> {
-    pub(crate) fn set_columns<Tuple>(self: &mut Self, tup: Tuple) where T: TableDesc<Columns=Tuple>, Tuple: ColumnTuple {
+    pub(crate) fn set_columns<Tuple>(&mut self, tup: Tuple) where T: TableDesc<Columns=Tuple>, Tuple: ColumnTuple {
         assert!(self.m_row_size == 0);
         self.m_row_size = tup.row_size();
         tup.init(&mut self.m_columns);
         //println!("{:?}", self.m_columns);
     }
 
-    pub(crate) fn set_row_count(self: &mut Self, count: u32) {
+    pub(crate) fn set_row_count(&mut self, count: u32) {
         self.m_row_count = count;
     }
 
@@ -246,7 +246,7 @@ impl<'db, T: TableDesc> TableInfo<'db, T> {
         if self.m_row_count < (1 << 16) { DynamicSize::Size2 } else { DynamicSize::Size4 }
     }
 
-    pub(crate) fn set_data(self: &mut Self, view: &'db [u8]) -> &'db [u8] {
+    pub(crate) fn set_data(&mut self, view: &'db [u8]) -> &'db [u8] {
         assert!(self.m_data.is_none());
 
         if self.m_row_count > 0 {
@@ -326,7 +326,7 @@ pub(crate) trait CodedIndex : Sized {
     type Database;
     type Tables;
 
-    fn decode(idx: u32, tables: Self::Database) -> Result<Option<Self>>;
+    fn decode(idx: u32, db: Self::Database) -> Result<Option<Self>>;
     fn index_size(tables: Self::Tables) -> DynamicSize;
     fn needs_4byte_index(row_count: u32, tag_bits: u8) -> bool {
         row_count >= (1u32 << (16 - tag_bits))
@@ -679,6 +679,7 @@ impl<'db> Database<'db> {
         where Tables<'db>: TableAccess<'db, T>
     {
         Table {
+            db: self,
             table: self.m_tables.get_table_info::<T>()
         }
     }

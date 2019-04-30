@@ -1,25 +1,25 @@
 use climeta::{database, schema};
 
-fn print_typedef(row: &database::TableRow<schema::TypeDef>, db: &database::Database) -> Result<(), Box<std::error::Error>> {
-    println!("{}.{}", row.type_namespace(&db)?, row.type_name(&db)?);
+fn print_typedef(row: &database::TableRow<schema::TypeDef>) -> Result<(), Box<std::error::Error>> {
+    println!("{}.{}", row.type_namespace()?, row.type_name()?);
 
-    for md in row.method_list(&db)? {
-        println!(" M {}", md.name(&db)?);
-        for mpar in md.param_list(&db)? {
-            println!("   P {} {}", mpar.sequence()?, mpar.name(&db)?);
+    for md in row.method_list()? {
+        println!(" M {}", md.name()?);
+        for mpar in md.param_list()? {
+            println!("   P {} {}", mpar.sequence()?, mpar.name()?);
         }
     }
-    // for fld in row.field_list(&db)? {
-    //     println!(" F {}", fld.name(&db)?);
+    // for fld in row.field_list()? {
+    //     println!(" F {}", fld.name()?);
     // }
 
-    match row.extends(&db)? {
+    match row.extends()? {
         None => println!(" Extends: <None>"),
         Some(schema::TypeDefOrRef::TypeDef(def)) => {
-            println!(" Extends: {}.{} (def)", def.type_namespace(&db)?, def.type_name(&db)?);
+            println!(" Extends: {}.{} (def)", def.type_namespace()?, def.type_name()?);
         },
         Some(schema::TypeDefOrRef::TypeRef(def)) => {
-            println!(" Extends: {}.{} (ref: {:?}) ", def.type_namespace(&db)?, def.type_name(&db)?, def.resolution_scope(&db)?);
+            println!(" Extends: {}.{} (ref: {:?}) ", def.type_namespace()?, def.type_name()?, def.resolution_scope()?);
         },
         _ => ()
     }
@@ -33,20 +33,20 @@ fn main() -> Result<(), Box<std::error::Error>> {
     let db = database::Database::load(&f1).unwrap();
     let typedefs = db.get_table::<schema::TypeDef>();
     for row in typedefs {
-        print_typedef(&row, &db)?;
+        print_typedef(&row)?;
     }
     for i in 0..typedefs.size() {
         println!("== {} ==", i);
-        print_typedef(&typedefs.get_row(i)?, &db)?;
-        print_typedef(&typedefs.iter().nth(i as usize).unwrap(), &db)?;
+        print_typedef(&typedefs.get_row(i)?)?;
+        print_typedef(&typedefs.iter().nth(i as usize).unwrap())?;
     }
     println!("TOTAL: {} == {}", typedefs.size(), typedefs.iter().count());
 
     // for cons in db.get_table::<schema::Constant>() {
-    //     let parent = cons.parent(&db)?;
+    //     let parent = cons.parent()?;
     //     println!("{:?}, parent: {:?}", cons.typ()?, parent);
     //     if let Some(schema::HasConstant::Field(f)) = parent {
-    //         println!("  {} -> {:?}", f.name(&db)?, cons.value(&db)?);
+    //         println!("  {} -> {:?}", f.name()?, cons.value()?);
     //     }
     // }
     
@@ -58,20 +58,20 @@ fn main() -> Result<(), Box<std::error::Error>> {
     }
     //let typedefs = db.get_table::<schema::TypeDef>();
     // for row in typedefs {
-    //     println!("{}.{}", row.type_namespace(&db)?, row.type_name(&db)?);
+    //     println!("{}.{}", row.type_namespace()?, row.type_name()?);
 
         
-    //     // for md in row.method_list(&db)? {
-    //     //     println!(" M {}", md.name(&db)?);
+    //     // for md in row.method_list()? {
+    //     //     println!(" M {}", md.name()?);
     //     // }
-    //     // for fld in row.field_list(&db)? {
-    //     //     println!(" F {}", fld.name(&db)?);
+    //     // for fld in row.field_list()? {
+    //     //     println!(" F {}", fld.name()?);
     //     // }
 
-    //     match row.extends(&db)? {
+    //     match row.extends()? {
     //         None => println!("  Extends: <None>"),
-    //         Some(schema::TypeDefOrRef::TypeDef(def)) => println!("  Extends: {}.{} (def)", def.type_namespace(&db)?, def.type_name(&db)?),
-    //         Some(schema::TypeDefOrRef::TypeRef(def)) => println!("  Extends: {}.{} (ref)", def.type_namespace(&db)?, def.type_name(&db)?),
+    //         Some(schema::TypeDefOrRef::TypeDef(def)) => println!("  Extends: {}.{} (def)", def.type_namespace()?, def.type_name()?),
+    //         Some(schema::TypeDefOrRef::TypeRef(def)) => println!("  Extends: {}.{} (ref)", def.type_namespace()?, def.type_name()?),
     //         _ => ()
     //     }
     // }

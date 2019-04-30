@@ -21,6 +21,7 @@ impl<T: TableDesc, Col: ColumnIndex> ColumnAccess<Col> for T
 
 #[derive(Copy, Clone)]
 pub struct Table<'db, T: TableDesc> {
+    pub(crate) db: &'db database::Database<'db>,
     pub(crate) table: &'db database::TableInfo<'db, T>,
 }
 
@@ -29,7 +30,7 @@ impl<'db, T: TableDesc> Table<'db, T> {
         self.table.m_row_count
     }
 
-    pub fn iter(&'db self) -> TableRowIterator<'db, T> {
+    pub fn iter(&self) -> TableRowIterator<'db, T> {
         self.into_iter()
     }
 
@@ -133,29 +134,29 @@ impl<'db, T: TableDesc> TableRow<'db, T> {
         self.m_table.get_value::<Col, _>(self.m_row)
     }
 
-    pub(crate) fn get_string<Col: ColumnIndex>(&self, db: &'db Database) -> Result<&'db str>
+    pub(crate) fn get_string<Col: ColumnIndex>(&self) -> Result<&'db str>
         where T: ColumnAccess<Col>, u32: ReadValue<T::ColumnSize>
     {
-        db.get_string(self.get_value::<Col, _>()?)
+        self.m_table.db.get_string(self.get_value::<Col, _>()?)
     }
 
-    pub(crate) fn get_blob<Col: ColumnIndex>(&self, db: &'db Database) -> Result<&'db [u8]>
+    pub(crate) fn get_blob<Col: ColumnIndex>(&self) -> Result<&'db [u8]>
         where T: ColumnAccess<Col>, u32: ReadValue<T::ColumnSize>
     {
-        db.get_blob(self.get_value::<Col, _>()?)
+        self.m_table.db.get_blob(self.get_value::<Col, _>()?)
     }
 
-    pub(crate) fn get_coded_index<Col: ColumnIndex, Target: database::CodedIndex>(&self, db: Target::Database) -> Result<Option<Target>>
+    pub(crate) fn get_coded_index<Col: ColumnIndex, Target: database::CodedIndex<Database=&'db Database<'db>>>(&self) -> Result<Option<Target>>
         where T: ColumnAccess<Col>, u32: ReadValue<T::ColumnSize>
     {
-        Target::decode(self.get_value::<Col, _>()?, db)
+        Target::decode(self.get_value::<Col, _>()?, self.m_table.db)
     }
 
-    pub(crate) fn get_list<Col: ColumnIndex, Target: TableDesc>(&self, db: &'db Database<'db>) -> Result<TableRowIterator<'db, Target>>
+    pub(crate) fn get_list<Col: ColumnIndex, Target: TableDesc>(&self) -> Result<TableRowIterator<'db, Target>>
         where database::Tables<'db>: database::TableAccess<'db, Target>,
               T: ColumnAccess<Col>, u32: ReadValue<T::ColumnSize>
     {
-        let target_table = db.get_table::<Target>();
+        let target_table = self.m_table.db.get_table::<Target>();
         let first = self.get_value::<Col, u32>()?;
         assert!(first != 0);
         let first = first - 1;
