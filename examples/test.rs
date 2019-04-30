@@ -1,6 +1,6 @@
 use climeta::{database, schema};
 
-fn print_typedef(row: &database::TableRow<schema::TypeDef>) -> Result<(), Box<std::error::Error>> {
+fn print_typedef(row: &schema::rows::TypeDef) -> Result<(), Box<std::error::Error>> {
     println!("{}.{} ({:?})", row.type_namespace()?, row.type_name()?, row.flags()?.semantics());
 
     for md in row.method_list()? {
@@ -38,7 +38,7 @@ fn main() -> Result<(), Box<std::error::Error>> {
     println!("=== Windows.Foundation.winmd ===");
     let f1 = database::mmap_file("C:\\Windows\\System32\\WinMetadata\\Windows.Foundation.winmd").unwrap();
     let db = database::Database::load(&f1).unwrap();
-    let typedefs = db.get_table::<schema::TypeDef>();
+    let typedefs = db.get_table::<schema::marker::TypeDef>();
     for row in typedefs {
         print_typedef(&row)?;
     }
@@ -72,7 +72,7 @@ fn main() -> Result<(), Box<std::error::Error>> {
     println!("=== Windows.UI.Xaml.winmd ===");
     let f2 = database::mmap_file("C:\\Windows\\System32\\WinMetadata\\Windows.UI.Xaml.winmd").unwrap();
     let db = database::Database::load(&f2).unwrap();
-    for cons in db.get_table::<schema::Constant>() {
+    for cons in db.get_table::<schema::marker::Constant>() {
         
     }
     //let typedefs = db.get_table::<schema::TypeDef>();

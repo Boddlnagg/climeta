@@ -1,6 +1,7 @@
 use crate::database::{TableDesc, TableKind, ColumnIndex, ColumnTupleAccess, Database,
                       ReadValue, ColumnSize};
 use crate::database;
+use crate::schema::rows::TableRowWrap;
 use crate::Result;
 
 #[derive(Default, Copy, Clone, Debug)]
@@ -25,7 +26,7 @@ pub struct Table<'db, T: TableKind> {
     pub(crate) table: &'db database::TableInfo<'db, T>,
 }
 
-impl<'db, T: TableKind> Table<'db, T> {
+impl<'db, T: TableKind> Table<'db, T> where &'db T: TableRowWrap<Table = crate::table::Table<'db, T>> {
     pub fn size(&self) -> u32 {
         self.table.m_row_count
     }
@@ -47,20 +48,20 @@ impl<'db, T: TableKind> Table<'db, T> {
         Ok(V::read_value(input, data_size))
     }
 
-    pub fn get_row(&self, row: u32) -> Result<TableRow<'db, T>> {
+    pub fn get_row(&self, row: u32) -> Result<<&'db T as TableRowWrap>::Out>
+    {
         if row > self.size() {
             return Err("Invalid row index".into());
         }
-
-        Ok(TableRow {
-            m_table: *self,
-            m_row: row
-        })
+        
+        Ok(<&'db T as TableRowWrap>::wrap(*self, row))
     }
 }
 
-impl<'db, T: TableKind> IntoIterator for Table<'db, T> {
-    type Item = TableRow<'db, T>;
+impl<'db, T: TableKind> IntoIterator for Table<'db, T>
+    where &'db T: TableRowWrap<Table = crate::table::Table<'db, T>>
+{
+    type Item = <&'db T as TableRowWrap>::Out;
     type IntoIter = TableRowIterator<'db, T>;
 
     fn into_iter(self) -> Self::IntoIter {
@@ -72,7 +73,7 @@ impl<'db, T: TableKind> IntoIterator for Table<'db, T> {
     }
 }
 
-pub struct TableRow<'db, T: TableKind> {
+pub struct Row<'db, T: TableKind> {
     m_table: Table<'db, T>,
     m_row: u32,
 }
@@ -83,8 +84,10 @@ pub struct TableRowIterator<'db, T: TableKind> {
     m_end: u32, // end of this iterator's range (exclusive)
 }
 
-impl<'db, T: TableKind> Iterator for TableRowIterator<'db, T> {
-    type Item = TableRow<'db, T>;
+impl<'db, T: TableKind> Iterator for TableRowIterator<'db, T>
+    where &'db T: TableRowWrap<Table = crate::table::Table<'db, T>>
+{
+    type Item = <&'db T as TableRowWrap>::Out;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.m_row < self.m_end {
@@ -125,8 +128,14 @@ impl<'db, T: TableKind> Iterator for TableRowIterator<'db, T> {
     }
 }
 
-impl<'db, T: TableKind> TableRow<'db, T> {
-    pub fn index(&self) -> u32 { self.m_row }
+impl<'db, T: TableKind> Row<'db, T> where &'db T: TableRowWrap<Table = crate::table::Table<'db, T>> {
+    pub(crate) fn new(table: crate::table::Table<'db, T>, row: u32) -> Row<'db, T> {
+        Row {
+            m_table: table,
+            m_row: row
+        }
+    }
+    pub(crate) fn index(&self) -> u32 { self.m_row }
 
     pub(crate) fn get_value<Col: ColumnIndex, V>(&self) -> Result<V>
         where T: ColumnAccess<Col>, V: ReadValue<T::ColumnSize>
@@ -154,7 +163,8 @@ impl<'db, T: TableKind> TableRow<'db, T> {
 
     pub(crate) fn get_list<Col: ColumnIndex, Target: TableKind>(&self) -> Result<TableRowIterator<'db, Target>>
         where database::Database<'db>: database::TableAccess<'db, Target>,
-              T: ColumnAccess<Col>, u32: ReadValue<T::ColumnSize>
+              T: ColumnAccess<Col>, u32: ReadValue<T::ColumnSize>,
+              &'db Target: TableRowWrap<Table = crate::table::Table<'db, Target>>
     {
         let target_table = self.m_table.db.get_table::<Target>();
         let first = self.get_value::<Col, u32>()?;
@@ -163,7 +173,7 @@ impl<'db, T: TableKind> TableRow<'db, T> {
 
         let last = if self.m_row + 1 < self.m_table.size() {
             // this is not the last row
-            let tmp = self.m_table.get_row(self.m_row + 1)?.get_value::<Col, u32>()?;
+            let tmp = self.m_table.get_value::<Col, u32>(self.m_row + 1)?;
             assert!(tmp != 0);
             tmp - 1
         } else {
@@ -177,9 +187,10 @@ impl<'db, T: TableKind> TableRow<'db, T> {
         })
     }
 
-    pub(crate) fn get_target_row<Col: ColumnIndex, Target: TableKind>(&self)  -> Result<TableRow<'db, Target>>
+    pub(crate) fn get_target_row<Col: ColumnIndex, Target: TableKind>(&self)  -> Result<<&'db Target as TableRowWrap>::Out>
         where database::Database<'db>: database::TableAccess<'db, Target>,
-              T: ColumnAccess<Col>, u32: ReadValue<T::ColumnSize>
+              T: ColumnAccess<Col>, u32: ReadValue<T::ColumnSize>,
+              &'db Target: TableRowWrap<Table = crate::table::Table<'db, Target>>
     {
         let target_table = self.m_table.db.get_table::<Target>();
         let row = self.get_value::<Col, u32>()?;

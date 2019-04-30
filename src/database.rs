@@ -11,7 +11,7 @@ use crate::table::Column;
 use crate::Result;
 use crate::ByteView;
 
-pub use crate::table::{Table, TableRow, TableRowIterator};
+pub use crate::table::{Table, Row, TableRowIterator};
 
 pub(crate) trait ReadValue<S: ColumnSize> {
     fn read_value(input: &[u8], size: u8) -> Self;
@@ -175,14 +175,14 @@ pub trait TableAccess<'db, T> {
 
 macro_rules! impl_table_access {
     ( $tab:ident ) => {
-        impl<'db> TableAccess<'db, schema::$tab> for Tables<'db> {
-            fn get_table_info(&self) -> &TableInfo<'db, schema::$tab> {
+        impl<'db> TableAccess<'db, schema::marker::$tab> for Tables<'db> {
+            fn get_table_info(&self) -> &TableInfo<'db, schema::marker::$tab> {
                 &self.$tab
             }
         }
 
-        impl<'db> TableAccess<'db, schema::$tab> for Database<'db> {
-            fn get_table_info(&self) -> &TableInfo<'db, schema::$tab> {
+        impl<'db> TableAccess<'db, schema::marker::$tab> for Database<'db> {
+            fn get_table_info(&self) -> &TableInfo<'db, schema::marker::$tab> {
                 &self.m_tables.$tab
             }
         }
@@ -286,44 +286,44 @@ impl<'db, T> Default for TableInfo<'db, T> {
 #[allow(non_snake_case)]
 #[derive(Default)]
 pub(crate) struct Tables<'db> {
-    TypeRef: TableInfo<'db, schema::TypeRef>,
-    GenericParamConstraint: TableInfo<'db, schema::GenericParamConstraint>,
-    TypeSpec: TableInfo<'db, schema::TypeSpec>,
-    TypeDef: TableInfo<'db, schema::TypeDef>,
-    CustomAttribute: TableInfo<'db, schema::CustomAttribute>,
-    MethodDef: TableInfo<'db, schema::MethodDef>,
-    MemberRef: TableInfo<'db, schema::MemberRef>,
-    Module: TableInfo<'db, schema::Module>,
-    Param: TableInfo<'db, schema::Param>,
-    InterfaceImpl: TableInfo<'db, schema::InterfaceImpl>,
-    Constant: TableInfo<'db, schema::Constant>,
-    Field: TableInfo<'db, schema::Field>,
-    FieldMarshal: TableInfo<'db, schema::FieldMarshal>,
-    DeclSecurity: TableInfo<'db, schema::DeclSecurity>,
-    ClassLayout: TableInfo<'db, schema::ClassLayout>,
-    FieldLayout: TableInfo<'db, schema::FieldLayout>,
-    StandAloneSig: TableInfo<'db, schema::StandAloneSig>,
-    EventMap: TableInfo<'db, schema::EventMap>,
-    Event: TableInfo<'db, schema::Event>,
-    PropertyMap: TableInfo<'db, schema::PropertyMap>,
-    Property: TableInfo<'db, schema::Property>,
-    MethodSemantics: TableInfo<'db, schema::MethodSemantics>,
-    MethodImpl: TableInfo<'db, schema::MethodImpl>,
-    ModuleRef: TableInfo<'db, schema::ModuleRef>,
-    ImplMap: TableInfo<'db, schema::ImplMap>,
-    FieldRVA: TableInfo<'db, schema::FieldRVA>,
-    Assembly: TableInfo<'db, schema::Assembly>,
-    AssemblyProcessor: TableInfo<'db, schema::AssemblyProcessor>,
-    AssemblyOS: TableInfo<'db, schema::AssemblyOS>,
-    AssemblyRef: TableInfo<'db, schema::AssemblyRef>,
-    AssemblyRefProcessor: TableInfo<'db, schema::AssemblyRefProcessor>,
-    AssemblyRefOS: TableInfo<'db, schema::AssemblyRefOS>,
-    File: TableInfo<'db, schema::File>,
-    ExportedType: TableInfo<'db, schema::ExportedType>,
-    ManifestResource: TableInfo<'db, schema::ManifestResource>,
-    NestedClass: TableInfo<'db, schema::NestedClass>,
-    GenericParam: TableInfo<'db, schema::GenericParam>,
-    MethodSpec: TableInfo<'db, schema::MethodSpec>,
+    TypeRef: TableInfo<'db, schema::marker::TypeRef>,
+    GenericParamConstraint: TableInfo<'db, schema::marker::GenericParamConstraint>,
+    TypeSpec: TableInfo<'db, schema::marker::TypeSpec>,
+    TypeDef: TableInfo<'db, schema::marker::TypeDef>,
+    CustomAttribute: TableInfo<'db, schema::marker::CustomAttribute>,
+    MethodDef: TableInfo<'db, schema::marker::MethodDef>,
+    MemberRef: TableInfo<'db, schema::marker::MemberRef>,
+    Module: TableInfo<'db, schema::marker::Module>,
+    Param: TableInfo<'db, schema::marker::Param>,
+    InterfaceImpl: TableInfo<'db, schema::marker::InterfaceImpl>,
+    Constant: TableInfo<'db, schema::marker::Constant>,
+    Field: TableInfo<'db, schema::marker::Field>,
+    FieldMarshal: TableInfo<'db, schema::marker::FieldMarshal>,
+    DeclSecurity: TableInfo<'db, schema::marker::DeclSecurity>,
+    ClassLayout: TableInfo<'db, schema::marker::ClassLayout>,
+    FieldLayout: TableInfo<'db, schema::marker::FieldLayout>,
+    StandAloneSig: TableInfo<'db, schema::marker::StandAloneSig>,
+    EventMap: TableInfo<'db, schema::marker::EventMap>,
+    Event: TableInfo<'db, schema::marker::Event>,
+    PropertyMap: TableInfo<'db, schema::marker::PropertyMap>,
+    Property: TableInfo<'db, schema::marker::Property>,
+    MethodSemantics: TableInfo<'db, schema::marker::MethodSemantics>,
+    MethodImpl: TableInfo<'db, schema::marker::MethodImpl>,
+    ModuleRef: TableInfo<'db, schema::marker::ModuleRef>,
+    ImplMap: TableInfo<'db, schema::marker::ImplMap>,
+    FieldRVA: TableInfo<'db, schema::marker::FieldRVA>,
+    Assembly: TableInfo<'db, schema::marker::Assembly>,
+    AssemblyProcessor: TableInfo<'db, schema::marker::AssemblyProcessor>,
+    AssemblyOS: TableInfo<'db, schema::marker::AssemblyOS>,
+    AssemblyRef: TableInfo<'db, schema::marker::AssemblyRef>,
+    AssemblyRefProcessor: TableInfo<'db, schema::marker::AssemblyRefProcessor>,
+    AssemblyRefOS: TableInfo<'db, schema::marker::AssemblyRefOS>,
+    File: TableInfo<'db, schema::marker::File>,
+    ExportedType: TableInfo<'db, schema::marker::ExportedType>,
+    ManifestResource: TableInfo<'db, schema::marker::ManifestResource>,
+    NestedClass: TableInfo<'db, schema::marker::NestedClass>,
+    GenericParam: TableInfo<'db, schema::marker::GenericParam>,
+    MethodSpec: TableInfo<'db, schema::marker::MethodSpec>,
 }
 
 impl<'db> Tables<'db> {
