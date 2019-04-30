@@ -6,44 +6,44 @@ use crate::database::{Col0, Col1, Col2, Col3, Col4, Col5};
 use crate::table::{TableRow, TableRowIterator};
 use crate::{Result, ByteView};
 
-pub struct Module;
-pub struct TypeRef;
-pub struct TypeDef;
-pub struct Field;
-pub struct MethodDef;
-pub struct Param;
-pub struct InterfaceImpl;
-pub struct MemberRef;
-pub struct Constant;
-pub struct CustomAttribute;
-pub struct FieldMarshal;
-pub struct DeclSecurity;
-pub struct ClassLayout;
-pub struct FieldLayout;
-pub struct StandAloneSig;
-pub struct EventMap;
-pub struct Event;
-pub struct PropertyMap;
-pub struct Property;
-pub struct MethodSemantics;
-pub struct MethodImpl;
-pub struct ModuleRef;
-pub struct TypeSpec;
-pub struct ImplMap;
-pub struct FieldRVA;
-pub struct Assembly;
-pub struct AssemblyProcessor;
-pub struct AssemblyOS;
-pub struct AssemblyRef;
-pub struct AssemblyRefProcessor;
-pub struct AssemblyRefOS;
-pub struct File;
-pub struct ExportedType;
-pub struct ManifestResource;
-pub struct NestedClass;
-pub struct GenericParam;
-pub struct MethodSpec;
-pub struct GenericParamConstraint;
+#[derive(Copy, Clone)] pub struct Module;
+#[derive(Copy, Clone)] pub struct TypeRef;
+#[derive(Copy, Clone)] pub struct TypeDef;
+#[derive(Copy, Clone)] pub struct Field;
+#[derive(Copy, Clone)] pub struct MethodDef;
+#[derive(Copy, Clone)] pub struct Param;
+#[derive(Copy, Clone)] pub struct InterfaceImpl;
+#[derive(Copy, Clone)] pub struct MemberRef;
+#[derive(Copy, Clone)] pub struct Constant;
+#[derive(Copy, Clone)] pub struct CustomAttribute;
+#[derive(Copy, Clone)] pub struct FieldMarshal;
+#[derive(Copy, Clone)] pub struct DeclSecurity;
+#[derive(Copy, Clone)] pub struct ClassLayout;
+#[derive(Copy, Clone)] pub struct FieldLayout;
+#[derive(Copy, Clone)] pub struct StandAloneSig;
+#[derive(Copy, Clone)] pub struct EventMap;
+#[derive(Copy, Clone)] pub struct Event;
+#[derive(Copy, Clone)] pub struct PropertyMap;
+#[derive(Copy, Clone)] pub struct Property;
+#[derive(Copy, Clone)] pub struct MethodSemantics;
+#[derive(Copy, Clone)] pub struct MethodImpl;
+#[derive(Copy, Clone)] pub struct ModuleRef;
+#[derive(Copy, Clone)] pub struct TypeSpec;
+#[derive(Copy, Clone)] pub struct ImplMap;
+#[derive(Copy, Clone)] pub struct FieldRVA;
+#[derive(Copy, Clone)] pub struct Assembly;
+#[derive(Copy, Clone)] pub struct AssemblyProcessor;
+#[derive(Copy, Clone)] pub struct AssemblyOS;
+#[derive(Copy, Clone)] pub struct AssemblyRef;
+#[derive(Copy, Clone)] pub struct AssemblyRefProcessor;
+#[derive(Copy, Clone)] pub struct AssemblyRefOS;
+#[derive(Copy, Clone)] pub struct File;
+#[derive(Copy, Clone)] pub struct ExportedType;
+#[derive(Copy, Clone)] pub struct ManifestResource;
+#[derive(Copy, Clone)] pub struct NestedClass;
+#[derive(Copy, Clone)] pub struct GenericParam;
+#[derive(Copy, Clone)] pub struct MethodSpec;
+#[derive(Copy, Clone)] pub struct GenericParamConstraint;
 
 impl TableDesc for Assembly {
     type Columns = (FixedSize4, FixedSize8, FixedSize4, DynamicSize, DynamicSize, DynamicSize);
@@ -184,7 +184,7 @@ macro_rules! coded_index {
             }
 
             fn index_size(tables: Self::Tables) -> DynamicSize {
-                if $(Self::needs_4byte_index(tables.get_table::<$ty>().size(), $bits))||+ {
+                if $(Self::needs_4byte_index(tables.get_table_info::<$ty>().m_row_count, $bits))||+ {
                     DynamicSize::Size4
                 } else {
                     DynamicSize::Size2

@@ -1,5 +1,5 @@
-use crate::database::{TableDesc, ColumnIndex, ColumnTuple, ColumnTupleAccess, Database,
-                      ReadValue, DynamicSize, ColumnSize};
+use crate::database::{TableDesc, ColumnIndex, ColumnTupleAccess, Database,
+                      ReadValue, ColumnSize};
 use crate::database;
 use crate::Result;
 
@@ -19,88 +19,46 @@ impl<T: TableDesc, Col: ColumnIndex> ColumnAccess<Col> for T
     type ColumnSize = <<T as TableDesc>::Columns as ColumnTupleAccess<Col>>::Out;
 }
 
+#[derive(Copy, Clone)]
 pub struct Table<'db, T: TableDesc> {
-    p: std::marker::PhantomData<T>,
-    m_row_count: u32,
-    m_row_size: u8,
-    m_columns: [Column; 6],
-    m_data: Option<&'db [u8]>,
+    pub(crate) table: &'db database::TableInfo<'db, T>,
 }
 
 impl<'db, T: TableDesc> Table<'db, T> {
-    pub(crate) fn set_columns<Tuple>(self: &mut Self, tup: Tuple) where T: TableDesc<Columns=Tuple>, Tuple: ColumnTuple {
-        assert!(self.m_row_size == 0);
-        self.m_row_size = tup.row_size();
-        tup.init(&mut self.m_columns);
-        //println!("{:?}", self.m_columns);
-    }
-
-    pub(crate) fn set_row_count(self: &mut Self, count: u32) {
-        self.m_row_count = count;
-    }
-
     pub fn size(&self) -> u32 {
-        self.m_row_count
+        self.table.m_row_count
     }
 
     pub fn iter(&'db self) -> TableRowIterator<'db, T> {
         self.into_iter()
     }
 
-    pub(crate) fn index_size(&self) -> DynamicSize {
-        if self.m_row_count < (1 << 16) { DynamicSize::Size2 } else { DynamicSize::Size4 }
-    }
-
-    pub(crate) fn set_data(self: &mut Self, view: &'db [u8]) -> &'db [u8] {
-        assert!(self.m_data.is_none());
-
-        if self.m_row_count > 0 {
-            assert!(self.m_row_size != 0);
-            let (left, right) = view.split_at(self.m_row_count as usize * self.m_row_size as usize);
-            self.m_data = Some(left);
-            right
-        } else {
-            view
-        }
-    }
-
     pub(crate) fn get_value<Col: ColumnIndex, V>(&self, row: u32) -> Result<V>
         where T: ColumnAccess<Col>, V: ReadValue<T::ColumnSize>
     {
-        let data_size = self.m_columns[Col::idx()].size;
+        let data_size = self.table.m_columns[Col::idx()].size;
 
         if row > self.size() {
             return Err("Invalid row index".into());
         }
-        let input = &self.m_data.unwrap()[row as usize * self.m_row_size as usize + self.m_columns[Col::idx()].offset as usize ..];
+        let input = &self.table.m_data.unwrap()[row as usize * self.table.m_row_size as usize +
+                                                self.table.m_columns[Col::idx()].offset as usize ..];
         Ok(V::read_value(input, data_size))
     }
 
-    pub fn get_row<'x>(&'x self, row: u32) -> Result<TableRow<'x, T>> {
+    pub fn get_row(&self, row: u32) -> Result<TableRow<'db, T>> {
         if row > self.size() {
             return Err("Invalid row index".into());
         }
 
         Ok(TableRow {
-            m_table: self,
+            m_table: *self,
             m_row: row
         })
     }
 }
 
-impl<'db, T: TableDesc> Default for Table<'db, T> where <T as TableDesc>::Columns: Default {
-   fn default() -> Self {
-        Table {
-            p: ::std::marker::PhantomData,
-            m_row_count: 0,
-            m_row_size: 0,
-            m_columns: [Default::default(); 6],
-            m_data: None,
-        }
-    }
-}
-
-impl<'db, T: TableDesc> IntoIterator for &'db Table<'db, T> {
+impl<'db, T: TableDesc> IntoIterator for Table<'db, T> {
     type Item = TableRow<'db, T>;
     type IntoIter = TableRowIterator<'db, T>;
 
@@ -114,12 +72,12 @@ impl<'db, T: TableDesc> IntoIterator for &'db Table<'db, T> {
 }
 
 pub struct TableRow<'db, T: TableDesc> {
-    m_table: &'db Table<'db, T>,
+    m_table: Table<'db, T>,
     m_row: u32,
 }
 
 pub struct TableRowIterator<'db, T: TableDesc> {
-    m_table: &'db Table<'db, T>,
+    m_table: Table<'db, T>,
     m_row: u32, // the next row to yield
     m_end: u32, // end of this iterator's range (exclusive)
 }
@@ -218,11 +176,11 @@ impl<'db, T: TableDesc> TableRow<'db, T> {
         })
     }
 
-    pub(crate) fn get_target_row<Col: ColumnIndex, Target: TableDesc>(&self, tables: &'db database::Tables<'db>)  -> Result<TableRow<'db, Target>>
+    pub(crate) fn get_target_row<Col: ColumnIndex, Target: TableDesc>(&self, db: &'db database::Database<'db>)  -> Result<TableRow<'db, Target>>
         where database::Tables<'db>: database::TableAccess<'db, Target>,
               T: ColumnAccess<Col>, u32: ReadValue<T::ColumnSize>
     {
-        let target_table = tables.get_table::<Target>();
+        let target_table = db.get_table::<Target>();
         let row = self.get_value::<Col, u32>()?;
         assert!(row != 0);
         target_table.get_row(row - 1)

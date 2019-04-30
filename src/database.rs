@@ -163,18 +163,18 @@ impl Default for DynamicSize {
     }
 }
 
-pub trait TableDesc {
+pub trait TableDesc: Copy {
     type Columns;
 }
 
 pub trait TableAccess<'db, T: TableDesc> {
-    fn get_table(&self) -> &Table<'db, T>;
+    fn get_table_info(&self) -> &TableInfo<'db, T>;
 }
 
 macro_rules! impl_table_access {
     ( $tab:ident ) => {
         impl<'db> TableAccess<'db, schema::$tab> for Tables<'db> {
-            fn get_table(&self) -> &Table<'db, schema::$tab> {
+            fn get_table_info(&self) -> &TableInfo<'db, schema::$tab> {
                 &self.$tab
             }
         }
@@ -220,52 +220,105 @@ impl_table_access!(NestedClass);
 impl_table_access!(GenericParam);
 impl_table_access!(MethodSpec);
 
+
+// TODO: not pub?
+pub struct TableInfo<'db, T: TableDesc> {
+    p: std::marker::PhantomData<T>,
+    pub(crate) m_row_count: u32,
+    pub(crate) m_row_size: u8,
+    pub(crate) m_columns: [Column; 6],
+    pub(crate) m_data: Option<&'db [u8]>,
+}
+
+impl<'db, T: TableDesc> TableInfo<'db, T> {
+    pub(crate) fn set_columns<Tuple>(self: &mut Self, tup: Tuple) where T: TableDesc<Columns=Tuple>, Tuple: ColumnTuple {
+        assert!(self.m_row_size == 0);
+        self.m_row_size = tup.row_size();
+        tup.init(&mut self.m_columns);
+        //println!("{:?}", self.m_columns);
+    }
+
+    pub(crate) fn set_row_count(self: &mut Self, count: u32) {
+        self.m_row_count = count;
+    }
+
+    pub(crate) fn index_size(&self) -> DynamicSize {
+        if self.m_row_count < (1 << 16) { DynamicSize::Size2 } else { DynamicSize::Size4 }
+    }
+
+    pub(crate) fn set_data(self: &mut Self, view: &'db [u8]) -> &'db [u8] {
+        assert!(self.m_data.is_none());
+
+        if self.m_row_count > 0 {
+            assert!(self.m_row_size != 0);
+            let (left, right) = view.split_at(self.m_row_count as usize * self.m_row_size as usize);
+            self.m_data = Some(left);
+            right
+        } else {
+            view
+        }
+    }
+}
+
+impl<'db, T: TableDesc> Default for TableInfo<'db, T> where <T as TableDesc>::Columns: Default {
+   fn default() -> Self {
+        TableInfo {
+            p: ::std::marker::PhantomData,
+            m_row_count: 0,
+            m_row_size: 0,
+            m_columns: [Default::default(); 6],
+            m_data: None,
+        }
+    }
+}
+
+
 #[allow(non_snake_case)]
 #[derive(Default)]
 pub struct Tables<'db> {
-    TypeRef: Table<'db, schema::TypeRef>,
-    GenericParamConstraint: Table<'db, schema::GenericParamConstraint>,
-    TypeSpec: Table<'db, schema::TypeSpec>,
-    TypeDef: Table<'db, schema::TypeDef>,
-    CustomAttribute: Table<'db, schema::CustomAttribute>,
-    MethodDef: Table<'db, schema::MethodDef>,
-    MemberRef: Table<'db, schema::MemberRef>,
-    Module: Table<'db, schema::Module>,
-    Param: Table<'db, schema::Param>,
-    InterfaceImpl: Table<'db, schema::InterfaceImpl>,
-    Constant: Table<'db, schema::Constant>,
-    Field: Table<'db, schema::Field>,
-    FieldMarshal: Table<'db, schema::FieldMarshal>,
-    DeclSecurity: Table<'db, schema::DeclSecurity>,
-    ClassLayout: Table<'db, schema::ClassLayout>,
-    FieldLayout: Table<'db, schema::FieldLayout>,
-    StandAloneSig: Table<'db, schema::StandAloneSig>,
-    EventMap: Table<'db, schema::EventMap>,
-    Event: Table<'db, schema::Event>,
-    PropertyMap: Table<'db, schema::PropertyMap>,
-    Property: Table<'db, schema::Property>,
-    MethodSemantics: Table<'db, schema::MethodSemantics>,
-    MethodImpl: Table<'db, schema::MethodImpl>,
-    ModuleRef: Table<'db, schema::ModuleRef>,
-    ImplMap: Table<'db, schema::ImplMap>,
-    FieldRVA: Table<'db, schema::FieldRVA>,
-    Assembly: Table<'db, schema::Assembly>,
-    AssemblyProcessor: Table<'db, schema::AssemblyProcessor>,
-    AssemblyOS: Table<'db, schema::AssemblyOS>,
-    AssemblyRef: Table<'db, schema::AssemblyRef>,
-    AssemblyRefProcessor: Table<'db, schema::AssemblyRefProcessor>,
-    AssemblyRefOS: Table<'db, schema::AssemblyRefOS>,
-    File: Table<'db, schema::File>,
-    ExportedType: Table<'db, schema::ExportedType>,
-    ManifestResource: Table<'db, schema::ManifestResource>,
-    NestedClass: Table<'db, schema::NestedClass>,
-    GenericParam: Table<'db, schema::GenericParam>,
-    MethodSpec: Table<'db, schema::MethodSpec>,
+    TypeRef: TableInfo<'db, schema::TypeRef>,
+    GenericParamConstraint: TableInfo<'db, schema::GenericParamConstraint>,
+    TypeSpec: TableInfo<'db, schema::TypeSpec>,
+    TypeDef: TableInfo<'db, schema::TypeDef>,
+    CustomAttribute: TableInfo<'db, schema::CustomAttribute>,
+    MethodDef: TableInfo<'db, schema::MethodDef>,
+    MemberRef: TableInfo<'db, schema::MemberRef>,
+    Module: TableInfo<'db, schema::Module>,
+    Param: TableInfo<'db, schema::Param>,
+    InterfaceImpl: TableInfo<'db, schema::InterfaceImpl>,
+    Constant: TableInfo<'db, schema::Constant>,
+    Field: TableInfo<'db, schema::Field>,
+    FieldMarshal: TableInfo<'db, schema::FieldMarshal>,
+    DeclSecurity: TableInfo<'db, schema::DeclSecurity>,
+    ClassLayout: TableInfo<'db, schema::ClassLayout>,
+    FieldLayout: TableInfo<'db, schema::FieldLayout>,
+    StandAloneSig: TableInfo<'db, schema::StandAloneSig>,
+    EventMap: TableInfo<'db, schema::EventMap>,
+    Event: TableInfo<'db, schema::Event>,
+    PropertyMap: TableInfo<'db, schema::PropertyMap>,
+    Property: TableInfo<'db, schema::Property>,
+    MethodSemantics: TableInfo<'db, schema::MethodSemantics>,
+    MethodImpl: TableInfo<'db, schema::MethodImpl>,
+    ModuleRef: TableInfo<'db, schema::ModuleRef>,
+    ImplMap: TableInfo<'db, schema::ImplMap>,
+    FieldRVA: TableInfo<'db, schema::FieldRVA>,
+    Assembly: TableInfo<'db, schema::Assembly>,
+    AssemblyProcessor: TableInfo<'db, schema::AssemblyProcessor>,
+    AssemblyOS: TableInfo<'db, schema::AssemblyOS>,
+    AssemblyRef: TableInfo<'db, schema::AssemblyRef>,
+    AssemblyRefProcessor: TableInfo<'db, schema::AssemblyRefProcessor>,
+    AssemblyRefOS: TableInfo<'db, schema::AssemblyRefOS>,
+    File: TableInfo<'db, schema::File>,
+    ExportedType: TableInfo<'db, schema::ExportedType>,
+    ManifestResource: TableInfo<'db, schema::ManifestResource>,
+    NestedClass: TableInfo<'db, schema::NestedClass>,
+    GenericParam: TableInfo<'db, schema::GenericParam>,
+    MethodSpec: TableInfo<'db, schema::MethodSpec>,
 }
 
 impl<'db> Tables<'db> {
-    pub fn get_table<T: TableDesc>(&self) -> &Table<'db, T> where Self: TableAccess<'db, T> {
-        <Self as TableAccess<'db, T>>::get_table(self)
+    pub fn get_table_info<T: TableDesc>(&self) -> &TableInfo<'db, T> where Self: TableAccess<'db, T> {
+        <Self as TableAccess<'db, T>>::get_table_info(self)
     }
 }
 
@@ -622,10 +675,12 @@ impl<'db> Database<'db> {
         })
     }
 
-    pub fn get_table<T: TableDesc>(&self) -> &Table<'db, T>
+    pub fn get_table<T: TableDesc>(&'db self) -> Table<'db, T>
         where Tables<'db>: TableAccess<'db, T>
     {
-        self.m_tables.get_table::<T>()
+        Table {
+            table: self.m_tables.get_table_info::<T>()
+        }
     }
 
     pub(crate) fn get_string(&self, index: u32) -> Result<&str> {
