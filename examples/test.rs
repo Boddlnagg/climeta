@@ -1,12 +1,19 @@
 use climeta::{database, schema};
 
 fn print_typedef(row: &database::TableRow<schema::TypeDef>) -> Result<(), Box<std::error::Error>> {
-    println!("{}.{}", row.type_namespace()?, row.type_name()?);
+    println!("{}.{} ({:?})", row.type_namespace()?, row.type_name()?, row.flags()?.semantics());
 
     for md in row.method_list()? {
         println!(" M {}", md.name()?);
         for mpar in md.param_list()? {
-            println!("   P {} {}", mpar.sequence()?, mpar.name()?);
+            let flags = mpar.flags()?;
+            let inout = match (flags.in_(), flags.out()) {
+                (true, true) => "in/out",
+                (true, false) => "in",
+                (false, true) => "out",
+                (false, false) => "-"
+            };
+            println!("   P {} {} ({})", mpar.sequence()?, mpar.name()?, inout);
         }
     }
     // for fld in row.field_list()? {
@@ -48,6 +55,18 @@ fn main() -> Result<(), Box<std::error::Error>> {
     //     if let Some(schema::HasConstant::Field(f)) = parent {
     //         println!("  {} -> {:?}", f.name()?, cons.value()?);
     //     }
+    // }
+
+    // for ms in db.get_table::<schema::MethodSemantics>() {
+    //     let meth = ms.method()?;
+    //     let sem = if ms.semantics()?.getter() {
+    //         "getter"
+    //     } else if ms.semantics()?.setter() {
+    //         "setter"
+    //     } else {
+    //         "..."
+    //     };
+    //     println!("Semantics for method {:?}: {:?}", meth.name()?, sem);
     // }
     
     println!("=== Windows.UI.Xaml.winmd ===");

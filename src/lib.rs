@@ -1,10 +1,36 @@
 #[macro_use]
 extern crate num_derive;
+extern crate num_traits;
+
+use num_traits::FromPrimitive;
 
 mod pe;
 mod table;
 pub mod schema;
 pub mod database;
+
+pub(crate) trait BitView {
+    fn get_bit(self, bit: usize) -> bool;
+    fn get_enum<T: FromPrimitive>(self, mask: Self) -> T;
+}
+
+impl BitView for u16 {
+    fn get_bit(self, bit: usize) -> bool {
+        (1 << bit) & self != 0
+    }
+    fn get_enum<T: FromPrimitive>(self, mask: Self) -> T {
+        T::from_u16(self & mask).unwrap()
+    }
+}
+
+impl BitView for u32 {
+    fn get_bit(self, bit: usize) -> bool {
+        (1 << bit) & self != 0
+    }
+    fn get_enum<T: FromPrimitive>(self, mask: Self) -> T {
+        T::from_u32(self & mask).unwrap()
+    }
+}
 
 pub(crate) trait ByteView {
     unsafe fn view_as<T>(&self, offset: usize) -> &T;

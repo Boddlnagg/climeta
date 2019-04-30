@@ -6,6 +6,8 @@ use crate::database::{Col0, Col1, Col2, Col3, Col4, Col5};
 use crate::table::{TableRow, TableRowIterator};
 use crate::{Result, ByteView};
 
+pub mod flags;
+
 #[derive(Copy, Clone)] pub struct Module;
 #[derive(Copy, Clone)] pub struct TypeRef;
 #[derive(Copy, Clone)] pub struct TypeDef;
@@ -512,15 +514,50 @@ impl<'db> TableRow<'db, Constant> {
     }
 }
 
+impl<'db> TableRow<'db, Event> {
+    pub fn event_flags(&self) -> Result<flags::EventAttributes> {
+        Ok(flags::EventAttributes(self.get_value::<Col0, _>()?))
+    }
+}
+
 impl<'db> TableRow<'db, Field> {
+    pub fn flags(&self) -> Result<flags::FieldAttributes> {
+        Ok(flags::FieldAttributes(self.get_value::<Col0, _>()?))
+    }
+
     pub fn name(&self) -> Result<&'db str> {
         self.get_string::<Col1>()
+    }
+}
+
+impl<'db> TableRow<'db, GenericParam> {
+    pub fn number(&self) -> Result<u16> {
+        self.get_value::<Col0, _>()
+    }
+
+    pub fn flags(&self) -> Result<flags::GenericParamAttributes> {
+        Ok(flags::GenericParamAttributes(self.get_value::<Col1, _>()?))
+    }
+
+    pub fn owner(&self) -> Result<Option<TypeOrMethodDef<'db>>> {
+        self.get_coded_index::<Col2, TypeOrMethodDef>()
+    }
+
+    pub fn name(&self) -> Result<&'db str> {
+        self.get_string::<Col3>()
     }
 }
 
 impl<'db> TableRow<'db, MethodDef> {
     pub fn rva(&self) -> Result<u32> {
         self.get_value::<Col0, _>()
+    }
+    pub fn impl_flags(&self) -> Result<flags::MethodImplAttributes> {
+        Ok(flags::MethodImplAttributes(self.get_value::<Col1, _>()?))
+    }
+
+    pub fn flags(&self) -> Result<flags::MethodAttributes> {
+        Ok(flags::MethodAttributes(self.get_value::<Col2, _>()?))
     }
 
     pub fn name(&self) -> Result<&'db str> {
@@ -532,7 +569,25 @@ impl<'db> TableRow<'db, MethodDef> {
     }
 }
 
+impl<'db> TableRow<'db, MethodSemantics> {
+    pub fn semantics(&self) -> Result<flags::MethodSemanticsAttributes> {
+        Ok(flags::MethodSemanticsAttributes(self.get_value::<Col0, _>()?))
+    }
+
+    pub fn method(&self) -> Result<TableRow<'db, MethodDef>> {
+        self.get_target_row::<Col1, MethodDef>()
+    }
+
+    pub fn association(&self) -> Result<Option<HasSemantics<'db>>> {
+        self.get_coded_index::<Col2, HasSemantics>()
+    }
+}
+
 impl<'db> TableRow<'db, Param> {
+    pub fn flags(&self) -> Result<flags::ParamAttributes> {
+        Ok(flags::ParamAttributes(self.get_value::<Col0, _>()?))
+    }
+
     pub fn sequence(&self) -> Result<u16> {
         self.get_value::<Col1, u16>()
     }
@@ -542,7 +597,17 @@ impl<'db> TableRow<'db, Param> {
     }
 }
 
+impl<'db> TableRow<'db, Property> {
+    pub fn flags(&self) -> Result<flags::PropertyAttributes> {
+        Ok(flags::PropertyAttributes(self.get_value::<Col0, _>()?))
+    }
+}
+
 impl<'db> TableRow<'db, TypeDef> {
+    pub fn flags(&self) -> Result<flags::TypeAttributes> {
+        Ok(flags::TypeAttributes(self.get_value::<Col0, _>()?))
+    }
+
     pub fn type_name(&self) -> Result<&'db str> {
         self.get_string::<Col1>()
     }
