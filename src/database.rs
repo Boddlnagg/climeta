@@ -120,30 +120,30 @@ impl<C0: ColumnSize, C1: ColumnSize, C2: ColumnSize, C3: ColumnSize, C4: ColumnS
 impl<C0: ColumnSize, C1: ColumnSize, C2: ColumnSize, C3: ColumnSize, C4: ColumnSize, C5: ColumnSize> ColumnTupleAccess<Col4> for (C0, C1, C2, C3, C4, C5) { type Out = C4; }
 impl<C0: ColumnSize, C1: ColumnSize, C2: ColumnSize, C3: ColumnSize, C4: ColumnSize, C5: ColumnSize> ColumnTupleAccess<Col5> for (C0, C1, C2, C3, C4, C5) { type Out = C5; }
 
-pub trait ColumnSize: Copy {
+pub(crate) trait ColumnSize: Copy {
     fn size(&self) -> u8;
 }
 
 #[derive(Copy, Clone, Default)]
-pub struct FixedSize2;
+pub(crate) struct FixedSize2;
 impl ColumnSize for FixedSize2 {
     fn size(&self) -> u8 { 2 }
 }
 
 #[derive(Copy, Clone, Default)]
-pub struct FixedSize4;
+pub(crate) struct FixedSize4;
 impl ColumnSize for FixedSize4 {
     fn size(&self) -> u8 { 4 }
 }
 
 #[derive(Copy, Clone, Default)]
-pub struct FixedSize8;
+pub(crate) struct FixedSize8;
 impl ColumnSize for FixedSize8 {
     fn size(&self) -> u8 { 8 }
 }
 
 #[derive(Copy, Clone, Debug)]
-pub enum DynamicSize {
+pub(crate) enum DynamicSize {
     Unset,
     Size2,
     Size4
@@ -163,11 +163,13 @@ impl Default for DynamicSize {
     }
 }
 
-pub trait TableDesc: Copy {
+pub trait TableKind: Copy {}
+
+pub(crate) trait TableDesc: TableKind {
     type Columns;
 }
 
-pub trait TableAccess<'db, T: TableDesc> {
+pub trait TableAccess<'db, T> {
     fn get_table_info(&self) -> &TableInfo<'db, T>;
 }
 
@@ -176,6 +178,12 @@ macro_rules! impl_table_access {
         impl<'db> TableAccess<'db, schema::$tab> for Tables<'db> {
             fn get_table_info(&self) -> &TableInfo<'db, schema::$tab> {
                 &self.$tab
+            }
+        }
+
+        impl<'db> TableAccess<'db, schema::$tab> for Database<'db> {
+            fn get_table_info(&self) -> &TableInfo<'db, schema::$tab> {
+                &self.m_tables.$tab
             }
         }
     }
@@ -222,7 +230,7 @@ impl_table_access!(MethodSpec);
 
 
 // TODO: not pub?
-pub struct TableInfo<'db, T: TableDesc> {
+pub struct TableInfo<'db, T> {
     p: std::marker::PhantomData<T>,
     pub(crate) m_row_count: u32,
     pub(crate) m_row_size: u8,
@@ -230,8 +238,9 @@ pub struct TableInfo<'db, T: TableDesc> {
     pub(crate) m_data: Option<&'db [u8]>,
 }
 
-impl<'db, T: TableDesc> TableInfo<'db, T> {
-    pub(crate) fn set_columns<Tuple>(&mut self, tup: Tuple) where T: TableDesc<Columns=Tuple>, Tuple: ColumnTuple {
+impl<'db, T> TableInfo<'db, T> {
+    pub(crate) fn set_columns<Tuple>(&mut self, tup: Tuple) where T: TableDesc<Columns=Tuple>, Tuple: ColumnTuple
+    {
         assert!(self.m_row_size == 0);
         self.m_row_size = tup.row_size();
         tup.init(&mut self.m_columns);
@@ -246,7 +255,8 @@ impl<'db, T: TableDesc> TableInfo<'db, T> {
         if self.m_row_count < (1 << 16) { DynamicSize::Size2 } else { DynamicSize::Size4 }
     }
 
-    pub(crate) fn set_data(&mut self, view: &'db [u8]) -> &'db [u8] {
+    pub(crate) fn set_data(&mut self, view: &'db [u8]) -> &'db [u8]
+    {
         assert!(self.m_data.is_none());
 
         if self.m_row_count > 0 {
@@ -260,7 +270,7 @@ impl<'db, T: TableDesc> TableInfo<'db, T> {
     }
 }
 
-impl<'db, T: TableDesc> Default for TableInfo<'db, T> where <T as TableDesc>::Columns: Default {
+impl<'db, T> Default for TableInfo<'db, T> {
    fn default() -> Self {
         TableInfo {
             p: ::std::marker::PhantomData,
@@ -275,7 +285,7 @@ impl<'db, T: TableDesc> Default for TableInfo<'db, T> where <T as TableDesc>::Co
 
 #[allow(non_snake_case)]
 #[derive(Default)]
-pub struct Tables<'db> {
+pub(crate) struct Tables<'db> {
     TypeRef: TableInfo<'db, schema::TypeRef>,
     GenericParamConstraint: TableInfo<'db, schema::GenericParamConstraint>,
     TypeSpec: TableInfo<'db, schema::TypeSpec>,
@@ -675,12 +685,16 @@ impl<'db> Database<'db> {
         })
     }
 
-    pub fn get_table<T: TableDesc>(&'db self) -> Table<'db, T>
-        where Tables<'db>: TableAccess<'db, T>
+    pub(crate) fn get_table_info<T: TableKind>(&self) -> &TableInfo<'db, T> where Self: TableAccess<'db, T> {
+        <Self as TableAccess<'db, T>>::get_table_info(self)
+    }
+
+    pub fn get_table<T: TableKind>(&'db self) -> Table<'db, T>
+        where Self: TableAccess<'db, T>
     {
         Table {
             db: self,
-            table: self.m_tables.get_table_info::<T>()
+            table: self.get_table_info::<T>()
         }
     }
 

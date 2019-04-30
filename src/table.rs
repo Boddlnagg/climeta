@@ -1,4 +1,4 @@
-use crate::database::{TableDesc, ColumnIndex, ColumnTupleAccess, Database,
+use crate::database::{TableDesc, TableKind, ColumnIndex, ColumnTupleAccess, Database,
                       ReadValue, ColumnSize};
 use crate::database;
 use crate::Result;
@@ -20,12 +20,12 @@ impl<T: TableDesc, Col: ColumnIndex> ColumnAccess<Col> for T
 }
 
 #[derive(Copy, Clone)]
-pub struct Table<'db, T: TableDesc> {
+pub struct Table<'db, T: TableKind> {
     pub(crate) db: &'db database::Database<'db>,
     pub(crate) table: &'db database::TableInfo<'db, T>,
 }
 
-impl<'db, T: TableDesc> Table<'db, T> {
+impl<'db, T: TableKind> Table<'db, T> {
     pub fn size(&self) -> u32 {
         self.table.m_row_count
     }
@@ -59,7 +59,7 @@ impl<'db, T: TableDesc> Table<'db, T> {
     }
 }
 
-impl<'db, T: TableDesc> IntoIterator for Table<'db, T> {
+impl<'db, T: TableKind> IntoIterator for Table<'db, T> {
     type Item = TableRow<'db, T>;
     type IntoIter = TableRowIterator<'db, T>;
 
@@ -72,18 +72,18 @@ impl<'db, T: TableDesc> IntoIterator for Table<'db, T> {
     }
 }
 
-pub struct TableRow<'db, T: TableDesc> {
+pub struct TableRow<'db, T: TableKind> {
     m_table: Table<'db, T>,
     m_row: u32,
 }
 
-pub struct TableRowIterator<'db, T: TableDesc> {
+pub struct TableRowIterator<'db, T: TableKind> {
     m_table: Table<'db, T>,
     m_row: u32, // the next row to yield
     m_end: u32, // end of this iterator's range (exclusive)
 }
 
-impl<'db, T: TableDesc> Iterator for TableRowIterator<'db, T> {
+impl<'db, T: TableKind> Iterator for TableRowIterator<'db, T> {
     type Item = TableRow<'db, T>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -125,7 +125,7 @@ impl<'db, T: TableDesc> Iterator for TableRowIterator<'db, T> {
     }
 }
 
-impl<'db, T: TableDesc> TableRow<'db, T> {
+impl<'db, T: TableKind> TableRow<'db, T> {
     pub fn index(&self) -> u32 { self.m_row }
 
     pub(crate) fn get_value<Col: ColumnIndex, V>(&self) -> Result<V>
@@ -152,8 +152,8 @@ impl<'db, T: TableDesc> TableRow<'db, T> {
         Target::decode(self.get_value::<Col, _>()?, self.m_table.db)
     }
 
-    pub(crate) fn get_list<Col: ColumnIndex, Target: TableDesc>(&self) -> Result<TableRowIterator<'db, Target>>
-        where database::Tables<'db>: database::TableAccess<'db, Target>,
+    pub(crate) fn get_list<Col: ColumnIndex, Target: TableKind>(&self) -> Result<TableRowIterator<'db, Target>>
+        where database::Database<'db>: database::TableAccess<'db, Target>,
               T: ColumnAccess<Col>, u32: ReadValue<T::ColumnSize>
     {
         let target_table = self.m_table.db.get_table::<Target>();
@@ -177,11 +177,11 @@ impl<'db, T: TableDesc> TableRow<'db, T> {
         })
     }
 
-    pub(crate) fn get_target_row<Col: ColumnIndex, Target: TableDesc>(&self, db: &'db database::Database<'db>)  -> Result<TableRow<'db, Target>>
-        where database::Tables<'db>: database::TableAccess<'db, Target>,
+    pub(crate) fn get_target_row<Col: ColumnIndex, Target: TableKind>(&self)  -> Result<TableRow<'db, Target>>
+        where database::Database<'db>: database::TableAccess<'db, Target>,
               T: ColumnAccess<Col>, u32: ReadValue<T::ColumnSize>
     {
-        let target_table = db.get_table::<Target>();
+        let target_table = self.m_table.db.get_table::<Target>();
         let row = self.get_value::<Col, u32>()?;
         assert!(row != 0);
         target_table.get_row(row - 1)

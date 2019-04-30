@@ -1,7 +1,7 @@
 use num_traits::FromPrimitive;
 use byteorder::{ByteOrder, LittleEndian};
 
-use crate::database::{TableDesc, FixedSize2, FixedSize4, FixedSize8, DynamicSize, Database, Tables, CodedIndex};
+use crate::database::{TableKind, TableDesc, FixedSize2, FixedSize4, FixedSize8, DynamicSize, Database, Tables, CodedIndex};
 use crate::database::{Col0, Col1, Col2, Col3, Col4, Col5};
 use crate::table::{TableRow, TableRowIterator};
 use crate::{Result, ByteView};
@@ -45,117 +45,155 @@ use crate::{Result, ByteView};
 #[derive(Copy, Clone)] pub struct MethodSpec;
 #[derive(Copy, Clone)] pub struct GenericParamConstraint;
 
+impl TableKind for Assembly {}
 impl TableDesc for Assembly {
     type Columns = (FixedSize4, FixedSize8, FixedSize4, DynamicSize, DynamicSize, DynamicSize);
 }
+impl TableKind for AssemblyOS {}
 impl TableDesc for AssemblyOS {
     type Columns = (FixedSize4, FixedSize4, FixedSize4);
 }
+impl TableKind for AssemblyProcessor {}
 impl TableDesc for AssemblyProcessor {
     type Columns = (FixedSize4,);
 }
+impl TableKind for AssemblyRef {}
 impl TableDesc for AssemblyRef {
     type Columns = (FixedSize8, FixedSize4, DynamicSize, DynamicSize, DynamicSize, DynamicSize);
 }
+impl TableKind for AssemblyRefOS {}
 impl TableDesc for AssemblyRefOS {
     type Columns = (FixedSize4, FixedSize4, FixedSize4, DynamicSize);
 }
+impl TableKind for AssemblyRefProcessor {}
 impl TableDesc for AssemblyRefProcessor {
     type Columns = (FixedSize4, DynamicSize);
 }
+impl TableKind for ClassLayout {}
 impl TableDesc for ClassLayout {
     type Columns = (FixedSize2, FixedSize4, DynamicSize);
 }
+impl TableKind for Constant {}
 impl TableDesc for Constant {
     type Columns = (FixedSize2, DynamicSize, DynamicSize);
 }
+impl TableKind for CustomAttribute {}
 impl TableDesc for CustomAttribute {
     type Columns = (DynamicSize, DynamicSize, DynamicSize);
 }
+impl TableKind for DeclSecurity {}
 impl TableDesc for DeclSecurity {
     type Columns = (FixedSize2, DynamicSize, DynamicSize);
 }
+impl TableKind for EventMap {}
 impl TableDesc for EventMap {
     type Columns = (DynamicSize, DynamicSize);
 }
+impl TableKind for Event {}
 impl TableDesc for Event {
     type Columns = (FixedSize2, DynamicSize, DynamicSize);
 }
+impl TableKind for ExportedType {}
 impl TableDesc for ExportedType {
     type Columns = (FixedSize4, FixedSize4, DynamicSize, DynamicSize, DynamicSize);
 }
+impl TableKind for Field {}
 impl TableDesc for Field {
     type Columns = (FixedSize2, DynamicSize, DynamicSize);
 }
+impl TableKind for FieldLayout {}
 impl TableDesc for FieldLayout {
     type Columns = (FixedSize4, DynamicSize);
 }
+impl TableKind for FieldMarshal {}
 impl TableDesc for FieldMarshal {
     type Columns = (DynamicSize, DynamicSize);
 }
+impl TableKind for FieldRVA {}
 impl TableDesc for FieldRVA {
     type Columns = (FixedSize4, DynamicSize);
 }
+impl TableKind for File {}
 impl TableDesc for File {
     type Columns = (FixedSize4, DynamicSize, DynamicSize);
 }
+impl TableKind for GenericParam {}
 impl TableDesc for GenericParam {
     type Columns = (FixedSize2, FixedSize2, DynamicSize, DynamicSize);
 }
+impl TableKind for GenericParamConstraint {}
 impl TableDesc for GenericParamConstraint {
     type Columns = (DynamicSize, DynamicSize);
 }
+impl TableKind for ImplMap {}
 impl TableDesc for ImplMap {
     type Columns = (FixedSize2, DynamicSize, DynamicSize, DynamicSize);
 }
+impl TableKind for InterfaceImpl {}
 impl TableDesc for InterfaceImpl {
     type Columns = (DynamicSize, DynamicSize);
 }
+impl TableKind for ManifestResource {}
 impl TableDesc for ManifestResource {
     type Columns = (FixedSize4, FixedSize4, DynamicSize, DynamicSize);
 }
+impl TableKind for MemberRef {}
 impl TableDesc for MemberRef {
     type Columns = (DynamicSize, DynamicSize, DynamicSize);
 }
+impl TableKind for MethodDef {}
 impl TableDesc for MethodDef {
     type Columns = (FixedSize4, FixedSize2, FixedSize2, DynamicSize, DynamicSize, DynamicSize);
 }
+impl TableKind for MethodImpl {}
 impl TableDesc for MethodImpl {
     type Columns = (DynamicSize, DynamicSize, DynamicSize);
 }
+impl TableKind for MethodSemantics {}
 impl TableDesc for MethodSemantics {
     type Columns = (FixedSize2, DynamicSize, DynamicSize);
 }
+impl TableKind for MethodSpec {}
 impl TableDesc for MethodSpec {
     type Columns = (DynamicSize, DynamicSize);
 }
+impl TableKind for Module {}
 impl TableDesc for Module {
     type Columns = (FixedSize2, DynamicSize, DynamicSize, DynamicSize, DynamicSize);
 }
+impl TableKind for ModuleRef {}
 impl TableDesc for ModuleRef {
     type Columns = (DynamicSize,);
 }
+impl TableKind for NestedClass {}
 impl TableDesc for NestedClass {
     type Columns = (DynamicSize, DynamicSize);
 }
+impl TableKind for Param {}
 impl TableDesc for Param {
     type Columns = (FixedSize2, FixedSize2, DynamicSize);
 }
+impl TableKind for Property {}
 impl TableDesc for Property {
     type Columns = (FixedSize2, DynamicSize, DynamicSize);
 }
+impl TableKind for PropertyMap {}
 impl TableDesc for PropertyMap {
     type Columns = (DynamicSize, DynamicSize);
 }
+impl TableKind for StandAloneSig {}
 impl TableDesc for StandAloneSig {
     type Columns = (DynamicSize,);
 }
+impl TableKind for TypeDef {}
 impl TableDesc for TypeDef {
     type Columns = (FixedSize4, DynamicSize, DynamicSize, DynamicSize, DynamicSize, DynamicSize);
 }
+impl TableKind for TypeRef {}
 impl TableDesc for TypeRef {
     type Columns = (DynamicSize, DynamicSize, DynamicSize);
 }
+impl TableKind for TypeSpec {}
 impl TableDesc for TypeSpec {
     type Columns = (DynamicSize,);
 }
