@@ -2,7 +2,8 @@ use crate::database::{Database, Tables, CodedIndex, DynamicSize};
 use crate::Result;
 
 pub mod flags;
-pub mod rows; // TODO: move
+mod rows;
+pub use rows::*;
 
 macro_rules! table_kind {
     ($ty:ident [$($colty:ty),+]) => {

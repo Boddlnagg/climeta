@@ -1,6 +1,6 @@
 use climeta::{database, schema};
 
-fn print_typedef(row: &schema::rows::TypeDef) -> Result<(), Box<std::error::Error>> {
+fn print_typedef(row: &schema::TypeDef) -> Result<(), Box<std::error::Error>> {
     println!("{}.{} ({:?})", row.type_namespace()?, row.type_name()?, row.flags()?.semantics());
 
     for md in row.method_list()? {

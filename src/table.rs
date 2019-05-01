@@ -1,7 +1,7 @@
 use crate::database::{TableDesc, TableKind, ColumnIndex, ColumnTupleAccess, Database,
                       ReadValue, ColumnSize};
 use crate::database;
-use crate::schema::rows::TableRowWrap;
+use crate::schema::TableRowWrap;
 use crate::Result;
 
 #[derive(Default, Copy, Clone, Debug)]
