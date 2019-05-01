@@ -38,7 +38,7 @@ fn main() -> Result<(), Box<std::error::Error>> {
     println!("=== Windows.Foundation.winmd ===");
     let f1 = database::mmap_file("C:\\Windows\\System32\\WinMetadata\\Windows.Foundation.winmd").unwrap();
     let db = database::Database::load(&f1).unwrap();
-    let typedefs = db.get_table::<schema::marker::TypeDef>();
+    let typedefs = db.get_table::<schema::TypeDef>();
     for row in typedefs {
         print_typedef(&row)?;
     }
@@ -72,7 +72,7 @@ fn main() -> Result<(), Box<std::error::Error>> {
     println!("=== Windows.UI.Xaml.winmd ===");
     let f2 = database::mmap_file("C:\\Windows\\System32\\WinMetadata\\Windows.UI.Xaml.winmd").unwrap();
     let db = database::Database::load(&f2).unwrap();
-    for cons in db.get_table::<schema::marker::Constant>() {
+    for cons in db.get_table::<schema::Constant>() {
         
     }
     //let typedefs = db.get_table::<schema::TypeDef>();

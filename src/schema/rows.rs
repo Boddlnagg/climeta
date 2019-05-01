@@ -7,10 +7,6 @@ use crate::{Result, ByteView};
 use crate::{database, schema};
 use crate::schema::marker;
 
-pub trait TableRow {
-    type Kind;
-}
-
 // TODO: better name
 pub trait TableRowWrap {
     type Table;
@@ -23,7 +19,7 @@ macro_rules! row_type {
     ($ty:ident) => {
         pub struct $ty<'db>(pub(crate) database::Row<'db, schema::marker::$ty>);
 
-        impl<'db> TableRow for $ty<'db> {
+        impl<'db> schema::TableRow for $ty<'db> {
             type Kind = schema::marker::$ty;
         }
     }

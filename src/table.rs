@@ -26,7 +26,7 @@ pub struct Table<'db, T: TableKind> {
     pub(crate) table: &'db database::TableInfo<'db, T>,
 }
 
-impl<'db, T: TableKind> Table<'db, T> where &'db T: TableRowWrap<Table = crate::table::Table<'db, T>> {
+impl<'db, T: TableKind> Table<'db, T> where &'db T: TableRowWrap<Table=Self> {
     pub fn size(&self) -> u32 {
         self.table.m_row_count
     }
@@ -128,7 +128,7 @@ impl<'db, T: TableKind> Iterator for TableRowIterator<'db, T>
     }
 }
 
-impl<'db, T: TableKind> Row<'db, T> where &'db T: TableRowWrap<Table = crate::table::Table<'db, T>> {
+impl<'db, T: TableKind> Row<'db, T> where &'db T: TableRowWrap<Table=crate::table::Table<'db, T>> {
     pub(crate) fn new(table: crate::table::Table<'db, T>, row: u32) -> Row<'db, T> {
         Row {
             m_table: table,
@@ -164,9 +164,10 @@ impl<'db, T: TableKind> Row<'db, T> where &'db T: TableRowWrap<Table = crate::ta
     pub(crate) fn get_list<Col: ColumnIndex, Target: TableKind>(&self) -> Result<TableRowIterator<'db, Target>>
         where database::Database<'db>: database::TableAccess<'db, Target>,
               T: ColumnAccess<Col>, u32: ReadValue<T::ColumnSize>,
-              &'db Target: TableRowWrap<Table = crate::table::Table<'db, Target>>
+              &'db Target: TableRowWrap<Table=crate::table::Table<'db, Target>>,
+              <&'db Target as TableRowWrap>::Out: crate::schema::TableRow<Kind=Target>,
     {
-        let target_table = self.m_table.db.get_table::<Target>();
+        let target_table = self.m_table.db.get_table::<<&'db Target as TableRowWrap>::Out>();
         let first = self.get_value::<Col, u32>()?;
         assert!(first != 0);
         let first = first - 1;
@@ -190,9 +191,10 @@ impl<'db, T: TableKind> Row<'db, T> where &'db T: TableRowWrap<Table = crate::ta
     pub(crate) fn get_target_row<Col: ColumnIndex, Target: TableKind>(&self)  -> Result<<&'db Target as TableRowWrap>::Out>
         where database::Database<'db>: database::TableAccess<'db, Target>,
               T: ColumnAccess<Col>, u32: ReadValue<T::ColumnSize>,
-              &'db Target: TableRowWrap<Table = crate::table::Table<'db, Target>>
+              &'db Target: TableRowWrap<Table=crate::table::Table<'db, Target>>,
+              <&'db Target as TableRowWrap>::Out: crate::schema::TableRow<Kind=Target>
     {
-        let target_table = self.m_table.db.get_table::<Target>();
+        let target_table = self.m_table.db.get_table::<<&'db Target as TableRowWrap>::Out>();
         let row = self.get_value::<Col, u32>()?;
         assert!(row != 0);
         target_table.get_row(row - 1)

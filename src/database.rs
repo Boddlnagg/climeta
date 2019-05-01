@@ -689,12 +689,12 @@ impl<'db> Database<'db> {
         <Self as TableAccess<'db, T>>::get_table_info(self)
     }
 
-    pub fn get_table<T: TableKind>(&'db self) -> Table<'db, T>
-        where Self: TableAccess<'db, T>
+    pub fn get_table<T: schema::TableRow>(&'db self) -> Table<'db, T::Kind>
+        where Self: TableAccess<'db, T::Kind>
     {
         Table {
             db: self,
-            table: self.get_table_info::<T>()
+            table: self.get_table_info::<T::Kind>()
         }
     }
 

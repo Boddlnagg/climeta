@@ -1,9 +1,13 @@
-use crate::database::{Database, Tables, CodedIndex, DynamicSize};
+use crate::database::{Database, Tables, TableKind, CodedIndex, DynamicSize};
 use crate::Result;
 
 pub mod flags;
 mod rows;
 pub use rows::*;
+
+pub trait TableRow {
+    type Kind: TableKind;
+}
 
 macro_rules! table_kind {
     ($ty:ident [$($colty:ty),+]) => {
@@ -93,7 +97,7 @@ macro_rules! coded_index {
                 }
                 let row = row - 1;
                 Ok(Some(match tag {
-                    $($n => $name::$ty(db.get_table::<marker::$ty>().get_row(row)?),)+
+                    $($n => $name::$ty(db.get_table::<$ty>().get_row(row)?),)+
                     _ => unreachable!()
                 }))
             }
