@@ -2,9 +2,9 @@ use num_traits::FromPrimitive;
 use byteorder::{ByteOrder, LittleEndian};
 
 use crate::database::{Col0, Col1, Col2, Col3, Col4, Col5};
-use crate::table::TableRowIterator;
+use crate::table::{Row, TableRowIterator};
 use crate::{Result, ByteView};
-use crate::{database, schema};
+use crate::schema;
 use crate::schema::marker;
 
 // TODO: better name
@@ -17,7 +17,7 @@ pub trait TableRowWrap {
 
 macro_rules! row_type {
     ($ty:ident) => {
-        pub struct $ty<'db>(pub(crate) database::Row<'db, schema::marker::$ty>);
+        pub struct $ty<'db>(pub(crate) Row<'db, schema::marker::$ty>);
 
         impl<'db> schema::TableRow for $ty<'db> {
             type Kind = schema::marker::$ty;

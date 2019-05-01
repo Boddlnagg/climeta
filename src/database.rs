@@ -11,7 +11,7 @@ use crate::table::Column;
 use crate::Result;
 use crate::ByteView;
 
-pub use crate::table::{Table, Row, TableRowIterator};
+pub use crate::table::{Table, TableRowIterator};
 
 pub(crate) trait ReadValue<S: ColumnSize> {
     fn read_value(input: &[u8], size: u8) -> Self;

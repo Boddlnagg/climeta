@@ -73,7 +73,7 @@ impl<'db, T: TableKind> IntoIterator for Table<'db, T>
     }
 }
 
-pub struct Row<'db, T: TableKind> {
+pub(crate) struct Row<'db, T: TableKind> {
     m_table: Table<'db, T>,
     m_row: u32,
 }
