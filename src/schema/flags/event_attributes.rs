@@ -1,4 +1,4 @@
-use crate::BitView;
+use crate::core::BitView;
 
 pub struct EventAttributes(pub(crate) u16);
 

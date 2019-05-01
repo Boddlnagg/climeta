@@ -1,20 +1,11 @@
-use crate::database::{Database, Tables, TableKind, CodedIndex, DynamicSize};
+use crate::database::{Database, Tables, CodedIndex};
 use crate::Result;
+
+use crate::core::columns::DynamicSize;
 
 pub mod flags;
 mod rows;
 pub use rows::*;
-
-pub trait TableRow {
-    type Kind: TableKind;
-}
-
-pub trait TableRowAccess {
-    type Table;
-    type Out: TableRow;
-
-    fn get(table: Self::Table, row: u32) -> Self::Out;
-}
 
 macro_rules! table_kind {
     ($ty:ident [$($colty:ty),+]) => {
@@ -26,7 +17,7 @@ macro_rules! table_kind {
         }
 
         impl<'a> super::TableRowAccess for &'a $ty {
-            type Table = crate::table::Table<'a, $ty>;
+            type Table = Table<'a, $ty>;
             type Out = super::rows::$ty<'a>;
 
             fn get(table: Self::Table, row: u32) -> Self::Out {
@@ -41,9 +32,9 @@ macro_rules! table_kind {
 }
 
 pub mod marker {
-    use crate::table::Row;
+    use crate::core::table::{Table, Row};
     use crate::database::{TableKind, TableDesc};
-    use crate::database::{FixedSize2, FixedSize4, FixedSize8, DynamicSize};
+    use crate::core::columns::{FixedSize2, FixedSize4, FixedSize8, DynamicSize};
 
     table_kind!(Assembly [FixedSize4, FixedSize8, FixedSize4, DynamicSize, DynamicSize, DynamicSize]);
     table_kind!(AssemblyOS [FixedSize4, FixedSize4, FixedSize4]);

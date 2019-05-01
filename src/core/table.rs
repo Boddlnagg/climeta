@@ -1,30 +1,68 @@
-use crate::database::{TableDesc, TableKind, ColumnIndex, ColumnTupleAccess, Database,
-                      ReadValue, ColumnSize};
+use crate::database::{TableDesc, TableKind, Database};
 use crate::database;
 use crate::schema::TableRowAccess;
 use crate::Result;
 
-#[derive(Default, Copy, Clone, Debug)]
-pub(crate) struct Column {
-    pub offset: u8,
-    pub size: u8,
+use crate::core::columns::{Column, ColumnIndex, ColumnTuple, ColumnAccess, ReadValue, DynamicSize};
+
+// TODO: not pub?
+pub struct TableInfo<'db, T> {
+    p: std::marker::PhantomData<T>,
+    pub(crate) m_row_count: u32,
+    pub(crate) m_row_size: u8,
+    pub(crate) m_columns: [Column; 6],
+    pub(crate) m_data: Option<&'db [u8]>,
 }
 
-pub(crate) trait ColumnAccess<Col> {
-    type ColumnSize: ColumnSize;
+impl<'db, T> TableInfo<'db, T> {
+    pub(crate) fn set_columns<Tuple>(&mut self, tup: Tuple) where T: TableDesc<Columns=Tuple>, Tuple: ColumnTuple
+    {
+        assert!(self.m_row_size == 0);
+        self.m_row_size = tup.row_size();
+        tup.init(&mut self.m_columns);
+        //println!("{:?}", self.m_columns);
+    }
+
+    pub(crate) fn set_row_count(&mut self, count: u32) {
+        self.m_row_count = count;
+    }
+
+    pub(crate) fn index_size(&self) -> DynamicSize {
+        if self.m_row_count < (1 << 16) { DynamicSize::Size2 } else { DynamicSize::Size4 }
+    }
+
+    pub(crate) fn set_data(&mut self, view: &'db [u8]) -> &'db [u8]
+    {
+        assert!(self.m_data.is_none());
+
+        if self.m_row_count > 0 {
+            assert!(self.m_row_size != 0);
+            let (left, right) = view.split_at(self.m_row_count as usize * self.m_row_size as usize);
+            self.m_data = Some(left);
+            right
+        } else {
+            view
+        }
+    }
 }
 
-impl<T: TableDesc, Col: ColumnIndex> ColumnAccess<Col> for T
-    where <T as TableDesc>::Columns: ColumnTupleAccess<Col>
-{
-    type ColumnSize = <<T as TableDesc>::Columns as ColumnTupleAccess<Col>>::Out;
+impl<'db, T> Default for TableInfo<'db, T> {
+   fn default() -> Self {
+        TableInfo {
+            p: ::std::marker::PhantomData,
+            m_row_count: 0,
+            m_row_size: 0,
+            m_columns: [Default::default(); 6],
+            m_data: None,
+        }
+    }
 }
 
 #[derive(Copy, Clone)]
 // TODO: try to use TableRow parameter instead of TableKind
 pub struct Table<'db, T: TableKind> {
     pub(crate) db: &'db database::Database<'db>,
-    pub(crate) table: &'db database::TableInfo<'db, T>,
+    pub(crate) table: &'db TableInfo<'db, T>,
 }
 
 impl<'db, T: TableKind> Table<'db, T> where &'db T: TableRowAccess<Table=Self> {
@@ -60,7 +98,7 @@ impl<'db, T: TableKind> Table<'db, T> where &'db T: TableRowAccess<Table=Self> {
 }
 
 impl<'db, T: TableKind> IntoIterator for Table<'db, T>
-    where &'db T: TableRowAccess<Table = crate::table::Table<'db, T>>
+    where &'db T: TableRowAccess<Table=Table<'db, T>>
 {
     type Item = <&'db T as TableRowAccess>::Out;
     type IntoIter = TableRowIterator<'db, T>;
@@ -86,7 +124,7 @@ pub struct TableRowIterator<'db, T: TableKind> {
 }
 
 impl<'db, T: TableKind> Iterator for TableRowIterator<'db, T>
-    where &'db T: TableRowAccess<Table = crate::table::Table<'db, T>>
+    where &'db T: TableRowAccess<Table=Table<'db, T>>
 {
     type Item = <&'db T as TableRowAccess>::Out;
 
@@ -129,8 +167,8 @@ impl<'db, T: TableKind> Iterator for TableRowIterator<'db, T>
     }
 }
 
-impl<'db, T: TableKind> Row<'db, T> where &'db T: TableRowAccess<Table=crate::table::Table<'db, T>> {
-    pub(crate) fn new(table: crate::table::Table<'db, T>, row: u32) -> Row<'db, T> {
+impl<'db, T: TableKind> Row<'db, T> where &'db T: TableRowAccess<Table=Table<'db, T>> {
+    pub(crate) fn new(table: Table<'db, T>, row: u32) -> Row<'db, T> {
         Row {
             m_table: table,
             m_row: row
@@ -165,7 +203,7 @@ impl<'db, T: TableKind> Row<'db, T> where &'db T: TableRowAccess<Table=crate::ta
     pub(crate) fn get_list<Col: ColumnIndex, Target: TableKind>(&self) -> Result<TableRowIterator<'db, Target>>
         where database::Database<'db>: database::TableAccess<'db, Target>,
               T: ColumnAccess<Col>, u32: ReadValue<T::ColumnSize>,
-              &'db Target: TableRowAccess<Table=crate::table::Table<'db, Target>>,
+              &'db Target: TableRowAccess<Table=Table<'db, Target>>,
               <&'db Target as TableRowAccess>::Out: crate::schema::TableRow<Kind=Target>,
     {
         let target_table = self.m_table.db.get_table::<<&'db Target as TableRowAccess>::Out>();
@@ -192,7 +230,7 @@ impl<'db, T: TableKind> Row<'db, T> where &'db T: TableRowAccess<Table=crate::ta
     pub(crate) fn get_target_row<Col: ColumnIndex, Target: TableKind>(&self)  -> Result<<&'db Target as TableRowAccess>::Out>
         where database::Database<'db>: database::TableAccess<'db, Target>,
               T: ColumnAccess<Col>, u32: ReadValue<T::ColumnSize>,
-              &'db Target: TableRowAccess<Table=crate::table::Table<'db, Target>>,
+              &'db Target: TableRowAccess<Table=Table<'db, Target>>,
               <&'db Target as TableRowAccess>::Out: crate::schema::TableRow<Kind=Target>
     {
         let target_table = self.m_table.db.get_table::<<&'db Target as TableRowAccess>::Out>();

@@ -1,11 +1,23 @@
 use num_traits::FromPrimitive;
 use byteorder::{ByteOrder, LittleEndian};
 
-use crate::database::{Col0, Col1, Col2, Col3, Col4, Col5};
-use crate::table::{Row, TableRowIterator};
-use crate::{Result, ByteView};
+use crate::core::columns::{Col0, Col1, Col2, Col3, Col4, Col5};
+use crate::core::table::{Row, TableRowIterator};
+use crate::core::ByteView;
+use crate::Result;
 use crate::schema;
 use crate::schema::marker;
+
+pub trait TableRow {
+    type Kind: crate::database::TableKind;
+}
+
+pub trait TableRowAccess {
+    type Table;
+    type Out: TableRow;
+
+    fn get(table: Self::Table, row: u32) -> Self::Out;
+}
 
 macro_rules! row_type {
     ($ty:ident) => {

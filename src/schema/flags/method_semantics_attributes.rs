@@ -1,4 +1,4 @@
-use crate::BitView;
+use crate::core::BitView;
 
 pub struct MethodSemanticsAttributes(pub(crate) u16);
 

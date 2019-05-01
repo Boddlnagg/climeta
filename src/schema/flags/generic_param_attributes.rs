@@ -1,4 +1,4 @@
-use crate::BitView;
+use crate::core::BitView;
 
 pub struct GenericParamAttributes(pub(crate) u16);
 

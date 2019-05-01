@@ -1,4 +1,4 @@
-use crate::BitView;
+use crate::core::BitView;
 
 pub struct PropertyAttributes(pub(crate) u16);
 
