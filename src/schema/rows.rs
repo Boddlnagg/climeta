@@ -7,14 +7,6 @@ use crate::{Result, ByteView};
 use crate::schema;
 use crate::schema::marker;
 
-// TODO: better name
-pub trait TableRowWrap {
-    type Table;
-    type Out;
-
-    fn wrap(table: Self::Table, row: u32) -> Self::Out;
-}
-
 macro_rules! row_type {
     ($ty:ident) => {
         pub struct $ty<'db>(pub(crate) Row<'db, schema::marker::$ty>);

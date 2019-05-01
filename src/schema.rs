@@ -9,6 +9,13 @@ pub trait TableRow {
     type Kind: TableKind;
 }
 
+pub trait TableRowAccess {
+    type Table;
+    type Out: TableRow;
+
+    fn get(table: Self::Table, row: u32) -> Self::Out;
+}
+
 macro_rules! table_kind {
     ($ty:ident [$($colty:ty),+]) => {
         #[derive(Copy, Clone)]
@@ -18,11 +25,11 @@ macro_rules! table_kind {
             // unfortunately no generic associated type Row<'db> yet ...
         }
 
-        impl<'a> TableRowWrap for &'a $ty {
+        impl<'a> super::TableRowAccess for &'a $ty {
             type Table = crate::table::Table<'a, $ty>;
             type Out = super::rows::$ty<'a>;
 
-            fn wrap(table: Self::Table, row: u32) -> Self::Out {
+            fn get(table: Self::Table, row: u32) -> Self::Out {
                 super::rows::$ty(Row::new(table, row))
             }
         }
@@ -35,7 +42,6 @@ macro_rules! table_kind {
 
 pub mod marker {
     use crate::table::Row;
-    use crate::schema::rows::TableRowWrap;
     use crate::database::{TableKind, TableDesc};
     use crate::database::{FixedSize2, FixedSize4, FixedSize8, DynamicSize};
 
