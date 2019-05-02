@@ -4,16 +4,26 @@ fn print_typedef(row: &schema::TypeDef) -> Result<(), Box<std::error::Error>> {
     println!("{}.{} ({:?})", row.type_namespace()?, row.type_name()?, row.flags()?.semantics());
 
     for md in row.method_list()? {
-        println!(" M {}", md.name()?);
-        for mpar in md.param_list()? {
+        let sig = md.signature()?;
+
+        println!(" - M {} with {} param(s)", md.name()?, sig.params().len());
+        
+        for (mpar, mpar_t) in md.param_list()?.skip_while(|p| if let Ok(0) = p.sequence() { true } else { false }).zip(sig.params()) {
             let flags = mpar.flags()?;
             let inout = match (flags.in_(), flags.out()) {
-                (true, true) => "in/out",
-                (true, false) => "in",
-                (false, true) => "out",
-                (false, false) => "-"
+                (true, true) => "In/Out", // probably never happens
+                (true, false) => "In",
+                (false, true) => "Out",
+                (false, false) => "-" // happens for constructors
             };
-            println!("   P {} {} ({})", mpar.sequence()?, mpar.name()?, inout);
+            println!("   - P {} {}: [{}] {:?}", mpar.sequence()?, mpar.name()?, inout, mpar_t.kind());
+        }
+        
+        let ret = sig.return_type().kind();
+        match ret {
+            schema::RetTypeKind::Type(schema::TypeSig::Class(schema::TypeDefOrRef::TypeRef(t))) |
+            schema::RetTypeKind::Type(schema::TypeSig::ValueType(schema::TypeDefOrRef::TypeRef(t))) => println!("   - R {}.{}", t.type_namespace()?, t.type_name()?),
+            _ => println!("   - R {:?}", ret)
         }
     }
     // for fld in row.field_list()? {
@@ -42,16 +52,11 @@ fn main() -> Result<(), Box<std::error::Error>> {
     for row in typedefs {
         print_typedef(&row)?;
     }
-    for i in 0..typedefs.size() {
-        println!("== {} ==", i);
-        print_typedef(&typedefs.get_row(i)?)?;
-        print_typedef(&typedefs.iter().nth(i as usize).unwrap())?;
-    }
     println!("TOTAL: {} == {}", typedefs.size(), typedefs.iter().count());
 
     // for cons in db.get_table::<schema::Constant>() {
     //     let parent = cons.parent()?;
-    //     println!("{:?}, parent: {:?}", cons.typ()?, parent);
+    //     println!("{:?}, parent: {:?}", cons.type_()?, parent);
     //     if let Some(schema::HasConstant::Field(f)) = parent {
     //         println!("  {} -> {:?}", f.name()?, cons.value()?);
     //     }
@@ -72,8 +77,9 @@ fn main() -> Result<(), Box<std::error::Error>> {
     println!("=== Windows.UI.Xaml.winmd ===");
     let f2 = database::mmap_file("C:\\Windows\\System32\\WinMetadata\\Windows.UI.Xaml.winmd").unwrap();
     let db = database::Database::load(&f2).unwrap();
-    for cons in db.get_table::<schema::Constant>() {
-        
+    let typedefs = db.get_table::<schema::TypeDef>();
+    for row in typedefs {
+        print_typedef(&row)?;
     }
     //let typedefs = db.get_table::<schema::TypeDef>();
     // for row in typedefs {

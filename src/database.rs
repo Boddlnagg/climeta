@@ -527,8 +527,7 @@ impl<'db> Database<'db> {
 
         let mut blob_size = initial_byte as usize;
 
-        for &byte in view.sub(1, blob_size_bytes - 1)
-        {
+        for &byte in view.sub(1, blob_size_bytes - 1) {
             blob_size = (blob_size << 8) + byte as usize;
         }
 

@@ -176,6 +176,10 @@ impl<'db, T: TableKind> Row<'db, T> where &'db T: TableRowAccess<Table=Table<'db
     }
     pub(crate) fn index(&self) -> u32 { self.m_row }
 
+    pub(crate) fn get_db(&self) -> &'db Database {
+        self.m_table.db
+    }
+
     pub(crate) fn get_value<Col: ColumnIndex, V>(&self) -> Result<V>
         where T: ColumnAccess<Col>, V: ReadValue<T::ColumnSize>
     {

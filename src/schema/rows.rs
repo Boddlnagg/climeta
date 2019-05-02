@@ -7,6 +7,8 @@ use crate::core::ByteView;
 use crate::Result;
 use crate::schema;
 use crate::schema::marker;
+use crate::schema::signatures::*;
+use crate::schema::flags::*;
 
 pub trait TableRow {
     type Kind: crate::database::TableKind;
@@ -69,8 +71,8 @@ row_type!(TypeRef);
 row_type!(TypeSpec);
 
 impl<'db> TypeDef<'db> {
-    pub fn flags(&self) -> Result<super::flags::TypeAttributes> {
-        Ok(super::flags::TypeAttributes(self.0.get_value::<Col0, _>()?))
+    pub fn flags(&self) -> Result<TypeAttributes> {
+        Ok(TypeAttributes(self.0.get_value::<Col0, _>()?))
     }
 
     pub fn type_name(&self) -> Result<&'db str> {
@@ -113,7 +115,7 @@ impl<'db> AssemblyRef<'db> {
 }
 
 impl<'db> Constant<'db> {
-    pub fn typ(&self) -> Result<super::ConstantType> {
+    pub fn type_(&self) -> Result<super::ConstantType> {
         <super::ConstantType as FromPrimitive>::from_u16(self.0.get_value::<Col0, _>()?).ok_or_else(|| "Invalid ConstantType".into())
     }
 
@@ -125,7 +127,7 @@ impl<'db> Constant<'db> {
         use super::ConstantType;
         use super::ConstantValue::*;
         let bytes = self.0.get_blob::<Col2>()?;
-        Ok(match self.typ()? {
+        Ok(match self.type_()? {
             ConstantType::Boolean => Boolean(bytes[0] != 0),
             ConstantType::Char => Char(LittleEndian::read_u16(bytes)),
             ConstantType::Int8 => Int8(bytes[0] as i8),
@@ -154,14 +156,14 @@ impl<'db> Constant<'db> {
 }
 
 impl<'db> Event<'db> {
-    pub fn event_flags(&self) -> Result<super::flags::EventAttributes> {
-        Ok(super::flags::EventAttributes(self.0.get_value::<Col0, _>()?))
+    pub fn event_flags(&self) -> Result<EventAttributes> {
+        Ok(EventAttributes(self.0.get_value::<Col0, _>()?))
     }
 }
 
 impl<'db> Field<'db> {
-    pub fn flags(&self) -> Result<super::flags::FieldAttributes> {
-        Ok(super::flags::FieldAttributes(self.0.get_value::<Col0, _>()?))
+    pub fn flags(&self) -> Result<FieldAttributes> {
+        Ok(FieldAttributes(self.0.get_value::<Col0, _>()?))
     }
 
     pub fn name(&self) -> Result<&'db str> {
@@ -174,8 +176,8 @@ impl<'db> GenericParam<'db> {
         self.0.get_value::<Col0, _>()
     }
 
-    pub fn flags(&self) -> Result<super::flags::GenericParamAttributes> {
-        Ok(super::flags::GenericParamAttributes(self.0.get_value::<Col1, _>()?))
+    pub fn flags(&self) -> Result<GenericParamAttributes> {
+        Ok(GenericParamAttributes(self.0.get_value::<Col1, _>()?))
     }
 
     pub fn owner(&self) -> Result<Option<super::TypeOrMethodDef<'db>>> {
@@ -191,16 +193,20 @@ impl<'db> MethodDef<'db> {
     pub fn rva(&self) -> Result<u32> {
         self.0.get_value::<Col0, _>()
     }
-    pub fn impl_flags(&self) -> Result<super::flags::MethodImplAttributes> {
-        Ok(super::flags::MethodImplAttributes(self.0.get_value::<Col1, _>()?))
+    pub fn impl_flags(&self) -> Result<MethodImplAttributes> {
+        Ok(MethodImplAttributes(self.0.get_value::<Col1, _>()?))
     }
 
-    pub fn flags(&self) -> Result<super::flags::MethodAttributes> {
-        Ok(super::flags::MethodAttributes(self.0.get_value::<Col2, _>()?))
+    pub fn flags(&self) -> Result<MethodAttributes> {
+        Ok(MethodAttributes(self.0.get_value::<Col2, _>()?))
     }
 
     pub fn name(&self) -> Result<&'db str> {
         self.0.get_string::<Col3>()
+    }
+
+    pub fn signature(&self) -> Result<MethodDefSig> {
+        MethodDefSig::decode(self.0.get_blob::<Col4>()?, self.0.get_db())
     }
 
     pub fn param_list(&self) -> Result<TableRowIterator<'db, marker::Param>> {
@@ -209,8 +215,8 @@ impl<'db> MethodDef<'db> {
 }
 
 impl<'db> MethodSemantics<'db> {
-    pub fn semantics(&self) -> Result<super::flags::MethodSemanticsAttributes> {
-        Ok(super::flags::MethodSemanticsAttributes(self.0.get_value::<Col0, _>()?))
+    pub fn semantics(&self) -> Result<MethodSemanticsAttributes> {
+        Ok(MethodSemanticsAttributes(self.0.get_value::<Col0, _>()?))
     }
 
     pub fn method(&self) -> Result<MethodDef<'db>> {
@@ -223,8 +229,8 @@ impl<'db> MethodSemantics<'db> {
 }
 
 impl<'db> Param<'db> {
-    pub fn flags(&self) -> Result<super::flags::ParamAttributes> {
-        Ok(super::flags::ParamAttributes(self.0.get_value::<Col0, _>()?))
+    pub fn flags(&self) -> Result<ParamAttributes> {
+        Ok(ParamAttributes(self.0.get_value::<Col0, _>()?))
     }
 
     pub fn sequence(&self) -> Result<u16> {
@@ -237,8 +243,8 @@ impl<'db> Param<'db> {
 }
 
 impl<'db> Property<'db> {
-    pub fn flags(&self) -> Result<super::flags::PropertyAttributes> {
-        Ok(super::flags::PropertyAttributes(self.0.get_value::<Col0, _>()?))
+    pub fn flags(&self) -> Result<PropertyAttributes> {
+        Ok(PropertyAttributes(self.0.get_value::<Col0, _>()?))
     }
 }
 
