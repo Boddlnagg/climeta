@@ -1,6 +1,7 @@
-use climeta::{database, schema};
+use climeta::database;
+use climeta::schema::{RetTypeKind, TypeSig, TypeDef, TypeDefOrRef};
 
-fn print_typedef(row: &schema::TypeDef) -> Result<(), Box<std::error::Error>> {
+fn print_typedef(row: &TypeDef) -> Result<(), Box<std::error::Error>> {
     println!("{}.{} ({:?})", row.type_namespace()?, row.type_name()?, row.flags()?.semantics());
 
     for md in row.method_list()? {
@@ -21,8 +22,7 @@ fn print_typedef(row: &schema::TypeDef) -> Result<(), Box<std::error::Error>> {
         
         let ret = sig.return_type().kind();
         match ret {
-            schema::RetTypeKind::Type(schema::TypeSig::Class(schema::TypeDefOrRef::TypeRef(t))) |
-            schema::RetTypeKind::Type(schema::TypeSig::ValueType(schema::TypeDefOrRef::TypeRef(t))) => println!("   - R {}.{}", t.type_namespace()?, t.type_name()?),
+            RetTypeKind::Type(TypeSig::Ref(_, TypeDefOrRef::TypeRef(t), _)) => println!("   - R {}.{}", t.type_namespace()?, t.type_name()?),
             _ => println!("   - R {:?}", ret)
         }
     }
@@ -32,10 +32,10 @@ fn print_typedef(row: &schema::TypeDef) -> Result<(), Box<std::error::Error>> {
 
     match row.extends()? {
         None => println!(" Extends: <None>"),
-        Some(schema::TypeDefOrRef::TypeDef(def)) => {
+        Some(TypeDefOrRef::TypeDef(def)) => {
             println!(" Extends: {}.{} (def)", def.type_namespace()?, def.type_name()?);
         },
-        Some(schema::TypeDefOrRef::TypeRef(def)) => {
+        Some(TypeDefOrRef::TypeRef(def)) => {
             println!(" Extends: {}.{} (ref: {:?}) ", def.type_namespace()?, def.type_name()?, def.resolution_scope()?);
         },
         _ => ()
@@ -48,7 +48,7 @@ fn main() -> Result<(), Box<std::error::Error>> {
     println!("=== Windows.Foundation.winmd ===");
     let f1 = database::mmap_file("C:\\Windows\\System32\\WinMetadata\\Windows.Foundation.winmd").unwrap();
     let db = database::Database::load(&f1).unwrap();
-    let typedefs = db.get_table::<schema::TypeDef>();
+    let typedefs = db.get_table::<TypeDef>();
     for row in typedefs {
         print_typedef(&row)?;
     }
@@ -77,11 +77,11 @@ fn main() -> Result<(), Box<std::error::Error>> {
     println!("=== Windows.UI.Xaml.winmd ===");
     let f2 = database::mmap_file("C:\\Windows\\System32\\WinMetadata\\Windows.UI.Xaml.winmd").unwrap();
     let db = database::Database::load(&f2).unwrap();
-    let typedefs = db.get_table::<schema::TypeDef>();
+    let typedefs = db.get_table::<TypeDef>();
     for row in typedefs {
-        print_typedef(&row)?;
+        //print_typedef(&row)?;
     }
-    //let typedefs = db.get_table::<schema::TypeDef>();
+    //let typedefs = db.get_table::<TypeDef>();
     // for row in typedefs {
     //     println!("{}.{}", row.type_namespace()?, row.type_name()?);
 
@@ -95,8 +95,8 @@ fn main() -> Result<(), Box<std::error::Error>> {
 
     //     match row.extends()? {
     //         None => println!("  Extends: <None>"),
-    //         Some(schema::TypeDefOrRef::TypeDef(def)) => println!("  Extends: {}.{} (def)", def.type_namespace()?, def.type_name()?),
-    //         Some(schema::TypeDefOrRef::TypeRef(def)) => println!("  Extends: {}.{} (ref)", def.type_namespace()?, def.type_name()?),
+    //         Some(TypeDefOrRef::TypeDef(def)) => println!("  Extends: {}.{} (def)", def.type_namespace()?, def.type_name()?),
+    //         Some(TypeDefOrRef::TypeRef(def)) => println!("  Extends: {}.{} (ref)", def.type_namespace()?, def.type_name()?),
     //         _ => ()
     //     }
     // }

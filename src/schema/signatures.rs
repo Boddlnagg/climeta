@@ -227,8 +227,13 @@ impl<'db> fmt::Debug for Array<'db> {
 }
 
 
+#[derive(Copy, Clone, Debug)]
+pub enum TypeTag {
+    Class,
+    ValueType
+}
 
-#[derive(Debug)]
+
 pub enum TypeSig<'db> {
     Boolean,
     Char,
@@ -245,15 +250,12 @@ pub enum TypeSig<'db> {
     I,
     U,
     Array(Array<'db>), // for ARRAY and SZARRAY
-    Class(TypeDefOrRef<'db>),
+    Ref(TypeTag, TypeDefOrRef<'db>, Option<Box<[TypeSig<'db>]>>),
     FnPtr, // TODO
-    GenericClassInst(TypeDefOrRef<'db>, Box<[TypeSig<'db>]>),
-    GenericValueTypeInst(TypeDefOrRef<'db>, Box<[TypeSig<'db>]>),
-    MVar(u32),
+    MVar(u32), // TODO: maybe unify with Var and introduce GenericVarScope::{Type, Method}
     Object,
     Ptr, // TODO
     String,
-    ValueType(TypeDefOrRef<'db>),
     Var(u32),
 }
 
@@ -276,7 +278,7 @@ impl<'db> TypeSig<'db> {
             bits::ELEMENT_TYPE_I => TypeSig::I,
             bits::ELEMENT_TYPE_U => TypeSig::U,
             bits::ELEMENT_TYPE_ARRAY => unimplemented!(),
-            bits::ELEMENT_TYPE_CLASS => TypeSig::Class(TypeDefOrRef::decode(uncompress_unsigned(cur)?, db)?.expect("Null type in Class TypeSig")),
+            bits::ELEMENT_TYPE_CLASS => TypeSig::Ref(TypeTag::Class, TypeDefOrRef::decode(uncompress_unsigned(cur)?, db)?.expect("Null type in Class TypeSig"), None),
             bits::ELEMENT_TYPE_FNPTR => unimplemented!(),
             bits::ELEMENT_TYPE_GENERICINST => Self::parse_generic_inst(cur, db)?,
             bits::ELEMENT_TYPE_MVAR => TypeSig::MVar(uncompress_unsigned(cur)?),
@@ -284,16 +286,16 @@ impl<'db> TypeSig<'db> {
             bits::ELEMENT_TYPE_PTR => unimplemented!(),
             bits::ELEMENT_TYPE_STRING => TypeSig::String,
             bits::ELEMENT_TYPE_SZARRAY => TypeSig::Array(Array::parse_szarray(cur, db)?),
-            bits::ELEMENT_TYPE_VALUETYPE => TypeSig::ValueType(TypeDefOrRef::decode(uncompress_unsigned(cur)?, db)?.expect("Null type in ValueType TypeSig")),
+            bits::ELEMENT_TYPE_VALUETYPE => TypeSig::Ref(TypeTag::ValueType, TypeDefOrRef::decode(uncompress_unsigned(cur)?, db)?.expect("Null type in ValueType TypeSig"), None),
             bits::ELEMENT_TYPE_VAR => TypeSig::Var(uncompress_unsigned(cur)?),
             b => return Err(format!("Unexpected element type for TypeSig: {}", b).into())
         })
     }
 
     fn parse_generic_inst(cur: &mut Cursor<&'db [u8]>, db: &'db Database) -> Result<TypeSig<'db>> {
-        let is_valuetype = match uncompress_unsigned(cur)? as u8 {
-            bits::ELEMENT_TYPE_CLASS => false,
-            bits::ELEMENT_TYPE_VALUETYPE => true,
+        let valuetype = match uncompress_unsigned(cur)? as u8 {
+            bits::ELEMENT_TYPE_CLASS => TypeTag::Class,
+            bits::ELEMENT_TYPE_VALUETYPE => TypeTag::ValueType,
             _ => return Err("Generic type instantiation signatures must begin with either ELEMENT_TYPE_CLASS or ELEMENT_TYPE_VALUE".into())
         };
 
@@ -303,10 +305,65 @@ impl<'db> TypeSig<'db> {
         for _ in 0..arg_count {
             args.push(TypeSig::parse(cur, db)?);
         }
-        if is_valuetype {
-            Ok(TypeSig::GenericClassInst(typ, args.into_boxed_slice()))
-        } else {
-            Ok(TypeSig::GenericValueTypeInst(typ, args.into_boxed_slice()))
+
+        Ok(TypeSig::Ref(valuetype, typ, Some(args.into_boxed_slice())))
+    }
+}
+
+fn fmt_typedeforref<'db>(t: &TypeDefOrRef<'db>, f: &mut fmt::Formatter) -> fmt::Result {
+    // ECMA-335, II.7.3
+    // FIXME: implement correctly and move to impl Debug for TypeRef ...
+    match t {
+        TypeDefOrRef::TypeDef(d) => write!(f, "TYPEDEF"), // TODO
+        TypeDefOrRef::TypeRef(r) => write!(f, "{}.{}", r.type_namespace().map_err(|_| fmt::Error)?, r.type_name().map_err(|_| fmt::Error)?),
+        TypeDefOrRef::TypeSpec(s) => write!(f, "TYPESPEC"), // TODO
+    }
+}
+
+impl<'db> fmt::Debug for TypeSig<'db> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        // ECMA-335, II.7.1
+        use TypeSig::*;
+        match *self {
+            Boolean => write!(f, "bool"),
+            Char => write!(f, "char"),
+            I1 => write!(f, "int8"),
+            U1 => write!(f, "unsigned int8"),
+            I2 => write!(f, "int16"),
+            U2 => write!(f, "unsigned int16"),
+            I4 => write!(f, "int32"),
+            U4 => write!(f, "unsigned int32"),
+            I8 => write!(f, "int64"),
+            U8 => write!(f, "unsigned int64"),
+            R4 => write!(f, "float32"),
+            R8 => write!(f, "float64"),
+            I => write!(f, "native int"),
+            U => write!(f, "native unsigned int"),
+            Array(ref array) => write!(f, "{:?}[]", array.elem_type()), // TODO: array shape?
+            Ref(tag, ref t, ref generic) => {
+                match tag {
+                    TypeTag::ValueType => write!(f, "valuetype "),
+                    TypeTag::Class => write!(f, "class ")
+                }?;
+                fmt_typedeforref(t, f)?;
+                if let Some(g) = generic {
+                    write!(f, "<")?;
+                    let mut first = true;
+                    for arg in g.iter() {
+                        if !first { write!(f, ", ")?; }
+                        first = false;
+                        write!(f, "{:?}", arg)?;
+                    }
+                    write!(f, ">")?;
+                }
+                Ok(())
+            }
+            FnPtr => unimplemented!(), // TODO
+            Var(n) => write!(f, "!{}", n),
+            MVar(n) => write!(f, "!!{}", n),
+            Object => write!(f, "object"),
+            Ptr => unimplemented!(), // TODO
+            String => write!(f, "string")
         }
     }
 }
@@ -321,12 +378,12 @@ pub enum RetTypeKind<'db> {
 impl<'db> fmt::Debug for RetTypeKind<'db> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         use RetTypeKind::*;
+        // ECMA-335, II.7.1
         match *self {
-            // TODO: improve debug printing or remove this
             Void => write!(f, "void")?,
             Type(ref t) => write!(f, "{:?}", t)?,
-            TypeByRef(ref t) => write!(f, "byref {:?}", t)?,
-            TypedReference => write!(f, "System.TypedReference")?
+            TypeByRef(ref t) => write!(f, "{:?}&", t)?,
+            TypedReference => write!(f, "typedref")?
         }
         Ok(())
     }
