@@ -3,8 +3,6 @@ use std::path::Path;
 use std::mem;
 use std::io;
 
-use memmap::{MmapOptions, Mmap};
-
 use crate::Result;
 use crate::schema;
 use crate::core::pe;
@@ -142,7 +140,6 @@ pub(crate) trait CodedIndex : Sized {
 }
 
 pub struct Database<'db> {
-    m_view: &'db [u8],
     m_strings: &'db [u8],
     m_blobs: &'db [u8],
     m_guids: &'db [u8],
@@ -151,7 +148,7 @@ pub struct Database<'db> {
 
 pub fn is_database<P: AsRef<Path>>(path: P) -> io::Result<bool> {
     let file = File::open(path.as_ref())?;
-    let mmap = unsafe { MmapOptions::new().map(&file)? };
+    let mmap = unsafe { memmap::Mmap::map(&file)? };
 
     if mmap.len() < mem::size_of::<pe::image_dos_header>() {
         return Ok(false);
@@ -217,11 +214,6 @@ fn stream_offset(name: &[u8]) -> usize {
     }
 
     (8 + name.len() + padding)
-}
-
-pub fn mmap_file<P: AsRef<Path>>(path: P) -> io::Result<Mmap> {
-    let file = File::open(path.as_ref())?;
-    unsafe { MmapOptions::new().map(&file) }
 }
 
 impl<'db> Database<'db> {
@@ -475,7 +467,6 @@ impl<'db> Database<'db> {
         t.GenericParamConstraint.set_data(view);
 
         Ok(Database {
-            m_view: data,
             m_strings,
             m_blobs,
             m_guids,

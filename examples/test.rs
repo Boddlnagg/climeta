@@ -1,5 +1,10 @@
-use climeta::database;
-use climeta::schema::{RetTypeKind, Type, TypeSpec, TypeDef, TypeDefOrRef};
+use climeta::Database;
+use climeta::schema::{RetTypeKind, Type, TypeDef, TypeDefOrRef};
+
+pub fn mmap_file<P: AsRef<std::path::Path>>(path: P) -> std::io::Result<memmap::Mmap> {
+    let file = std::fs::File::open(path.as_ref())?;
+    unsafe { memmap::Mmap::map(&file) }
+}
 
 fn print_typedef(row: &TypeDef) -> Result<(), Box<std::error::Error>> {
     println!("{}.{} ({:?})", row.type_namespace()?, row.type_name()?, row.flags()?.semantics());
@@ -46,8 +51,7 @@ fn print_typedef(row: &TypeDef) -> Result<(), Box<std::error::Error>> {
 
 fn main() -> Result<(), Box<std::error::Error>> {
     println!("=== Windows.Foundation.winmd ===");
-    let f1 = database::mmap_file("C:\\Windows\\System32\\WinMetadata\\Windows.Foundation.winmd").unwrap();
-    let db = database::Database::load(&f1).unwrap();
+    let db = Database::from_file("C:\\Windows\\System32\\WinMetadata\\Windows.Foundation.winmd")?;
     let typedefs = db.get_table::<TypeDef>();
     for row in typedefs {
         print_typedef(&row)?;
@@ -80,12 +84,13 @@ fn main() -> Result<(), Box<std::error::Error>> {
     // }
     
     println!("=== Windows.UI.Xaml.winmd ===");
-    let f2 = database::mmap_file("C:\\Windows\\System32\\WinMetadata\\Windows.UI.Xaml.winmd").unwrap();
-    let db = database::Database::load(&f2).unwrap();
+    let f2 = mmap_file("C:\\Windows\\System32\\WinMetadata\\Windows.UI.Xaml.winmd").unwrap();
+    let db = Database::from_data(&f2).unwrap();
     let typedefs = db.get_table::<TypeDef>();
     for row in typedefs {
         //print_typedef(&row)?;
     }
+
     //let typedefs = db.get_table::<TypeDef>();
     // for row in typedefs {
     //     println!("{}.{}", row.type_namespace()?, row.type_name()?);
@@ -105,7 +110,8 @@ fn main() -> Result<(), Box<std::error::Error>> {
     //         _ => ()
     //     }
     // }
-    // println!("TOTAL: {}", typedefs.size());
+
+    println!("TOTAL: {}", typedefs.size());
 
     Ok(())
 }

@@ -37,12 +37,13 @@ fn uncompress_unsigned(cursor: &mut Cursor<&[u8]>) -> Result<u32> {
     }
 }
 
+#[allow(dead_code, unused_variables)]
 fn uncompress_signed(cursor: &mut Cursor<&[u8]>) -> Result<i32> {
     unimplemented!()
 }
 
 
-#[allow(non_upper_case_globals)]
+#[allow(non_upper_case_globals, dead_code)]
 mod bits {
     pub const CallingConvention_mask: u8 = 0x15; // 10101
     pub const DEFAULT: u8 = 0x00;
@@ -332,9 +333,9 @@ fn fmt_typedeforref<'db>(t: &TypeDefOrRef<'db>, f: &mut fmt::Formatter) -> fmt::
     // ECMA-335, II.7.3
     // FIXME: implement correctly and move to impl Debug for TypeRef ...
     match t {
-        TypeDefOrRef::TypeDef(d) => write!(f, "TYPEDEF"), // TODO
+        TypeDefOrRef::TypeDef(_d) => write!(f, "TYPEDEF"), // TODO
         TypeDefOrRef::TypeRef(r) => write!(f, "{}.{}", r.type_namespace().map_err(|_| fmt::Error)?, r.type_name().map_err(|_| fmt::Error)?),
-        TypeDefOrRef::TypeSpec(s) => write!(f, "TYPESPEC"), // TODO
+        TypeDefOrRef::TypeSpec(_s) => write!(f, "TYPESPEC"), // TODO
     }
 }
 

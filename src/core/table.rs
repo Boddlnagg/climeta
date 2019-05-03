@@ -59,6 +59,8 @@ impl<'db, T> Default for TableInfo<'db, T> {
 #[derive(Copy, Clone)]
 // TODO: try to use TableRow parameter instead of TableKind
 pub struct Table<'db, T: TableKind> {
+    // TODO: we could potentially derive the Database location statically from the
+    //       TableInfo pointer, with some unsafe code ... not sure whether that's worth it
     pub(crate) db: &'db database::Database<'db>,
     pub(crate) table: &'db TableInfo<'db, T>,
 }
@@ -171,7 +173,6 @@ impl<'db, T: TableKind> Row<'db, T> where &'db T: TableRowAccess<Table=Table<'db
             m_row: row
         }
     }
-    pub(crate) fn index(&self) -> u32 { self.m_row }
 
     pub(crate) fn get_db(&self) -> &'db Database {
         self.m_table.db
