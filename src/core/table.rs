@@ -1,6 +1,6 @@
 use crate::database::{TableDesc, TableKind, Database};
 use crate::database;
-use crate::schema::TableRowAccess;
+use crate::{TableRow, TableRowAccess};
 use crate::Result;
 
 use crate::core::columns::{Column, ColumnIndex, ColumnTuple, ColumnAccess, ReadValue, DynamicSize};
@@ -206,7 +206,7 @@ impl<'db, T: TableKind> Row<'db, T> where &'db T: TableRowAccess<Table=Table<'db
         where database::Database<'db>: database::TableAccess<'db, Target>,
               T: ColumnAccess<Col>, u32: ReadValue<T::ColumnSize>,
               &'db Target: TableRowAccess<Table=Table<'db, Target>>,
-              <&'db Target as TableRowAccess>::Out: crate::schema::TableRow<Kind=Target>,
+              <&'db Target as TableRowAccess>::Out: TableRow<Kind=Target>,
     {
         let target_table = self.m_table.db.get_table::<<&'db Target as TableRowAccess>::Out>();
         let first = self.get_value::<Col, u32>()?;
@@ -233,7 +233,7 @@ impl<'db, T: TableKind> Row<'db, T> where &'db T: TableRowAccess<Table=Table<'db
         where database::Database<'db>: database::TableAccess<'db, Target>,
               T: ColumnAccess<Col>, u32: ReadValue<T::ColumnSize>,
               &'db Target: TableRowAccess<Table=Table<'db, Target>>,
-              <&'db Target as TableRowAccess>::Out: crate::schema::TableRow<Kind=Target>
+              <&'db Target as TableRowAccess>::Out: TableRow<Kind=Target>
     {
         let target_table = self.m_table.db.get_table::<<&'db Target as TableRowAccess>::Out>();
         let row = self.get_value::<Col, u32>()?;

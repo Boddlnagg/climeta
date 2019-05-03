@@ -52,7 +52,7 @@ fn print_typedef(row: &TypeDef) -> Result<(), Box<std::error::Error>> {
 fn main() -> Result<(), Box<std::error::Error>> {
     println!("=== Windows.Foundation.winmd ===");
     let db = Database::from_file("C:\\Windows\\System32\\WinMetadata\\Windows.Foundation.winmd")?;
-    let typedefs = db.get_table::<TypeDef>();
+    let typedefs = db.table::<TypeDef>();
     for row in typedefs {
         print_typedef(&row)?;
     }
@@ -86,7 +86,7 @@ fn main() -> Result<(), Box<std::error::Error>> {
     println!("=== Windows.UI.Xaml.winmd ===");
     let f2 = mmap_file("C:\\Windows\\System32\\WinMetadata\\Windows.UI.Xaml.winmd").unwrap();
     let db = Database::from_data(&f2).unwrap();
-    let typedefs = db.get_table::<TypeDef>();
+    let typedefs = db.table::<TypeDef>();
     for row in typedefs {
         //print_typedef(&row)?;
     }

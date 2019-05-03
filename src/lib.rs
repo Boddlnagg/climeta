@@ -8,11 +8,14 @@ use std::ops::Deref;
 
 
 mod core;
+mod database; // TODO: move into core
 
 pub mod schema;
-pub mod database;
 
 type Result<T> = ::std::result::Result<T, Box<std::error::Error>>; // TODO: better error type
+
+pub use crate::core::table::Table;
+pub use crate::database::is_database;
 
 
 // our own little copy of owning_ref::OwningHandle where the H: Deref bound is dropped
@@ -93,6 +96,62 @@ impl<'db> Deref for DatabaseInner<'db> {
 
 pub struct Database<'db>(DatabaseInner<'db>);
 
+pub trait TableAccess<'db, T: TableRow> {
+    fn get_table(&'db self) -> Table<'db, T::Kind>;
+}
+
+macro_rules! impl_table_access {
+    ( $tab:ident ) => {
+        impl<'db> TableAccess<'db, schema::$tab<'db>> for Database<'db> {
+            fn get_table(&'db self) -> Table<'db, <schema::$tab<'db> as TableRow>::Kind> {
+                Table {
+                    db: self.0.deref(),
+                    table: self.0.deref().get_table_info::<<schema::$tab<'db> as TableRow>::Kind>()
+                }
+            }
+        }
+    }
+}
+
+impl_table_access!(TypeRef);
+impl_table_access!(GenericParamConstraint);
+impl_table_access!(TypeSpec);
+impl_table_access!(TypeDef);
+impl_table_access!(CustomAttribute);
+impl_table_access!(MethodDef);
+impl_table_access!(MemberRef);
+impl_table_access!(Module);
+impl_table_access!(Param);
+impl_table_access!(InterfaceImpl);
+impl_table_access!(Constant);
+impl_table_access!(Field);
+impl_table_access!(FieldMarshal);
+impl_table_access!(DeclSecurity);
+impl_table_access!(ClassLayout);
+impl_table_access!(FieldLayout);
+impl_table_access!(StandAloneSig);
+impl_table_access!(EventMap);
+impl_table_access!(Event);
+impl_table_access!(PropertyMap);
+impl_table_access!(Property);
+impl_table_access!(MethodSemantics);
+impl_table_access!(MethodImpl);
+impl_table_access!(ModuleRef);
+impl_table_access!(ImplMap);
+impl_table_access!(FieldRVA);
+impl_table_access!(Assembly);
+impl_table_access!(AssemblyProcessor);
+impl_table_access!(AssemblyOS);
+impl_table_access!(AssemblyRef);
+impl_table_access!(AssemblyRefProcessor);
+impl_table_access!(AssemblyRefOS);
+impl_table_access!(File);
+impl_table_access!(ExportedType);
+impl_table_access!(ManifestResource);
+impl_table_access!(NestedClass);
+impl_table_access!(GenericParam);
+impl_table_access!(MethodSpec);
+
 impl<'db> Database<'db> {
     pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Database<'db>> {
         let file = File::open(path.as_ref())?;
@@ -106,12 +165,20 @@ impl<'db> Database<'db> {
         Ok(Database(DatabaseInner::Borrowed(database::Database::load(data)?)))
     }
 
-    pub fn get_table<T: crate::schema::TableRow>(&'db self) -> crate::core::table::Table<'db, T::Kind>
-        where database::Database<'db>: database::TableAccess<'db, T::Kind>
+    pub fn table<T: TableRow>(&'db self) -> Table<'db, T::Kind>
+        where Self: TableAccess<'db, T>
     {
-        crate::core::table::Table {
-            db: self.0.deref(),
-            table: self.0.deref().get_table_info::<T::Kind>()
-        }
+        self.get_table()
     }
+}
+
+pub trait TableRow {
+    type Kind: crate::database::TableKind;
+}
+
+pub trait TableRowAccess {
+    type Table;
+    type Out: TableRow;
+
+    fn get(table: Self::Table, row: u32) -> Self::Out;
 }

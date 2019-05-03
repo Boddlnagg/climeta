@@ -19,7 +19,7 @@ pub(crate) trait TableDesc: TableKind {
     type Columns;
 }
 
-pub trait TableAccess<'db, T> {
+pub(crate) trait TableAccess<'db, T> {
     fn get_table_info(&self) -> &TableInfo<'db, T>;
 }
 
@@ -139,11 +139,11 @@ pub(crate) trait CodedIndex : Sized {
     }
 }
 
-pub struct Database<'db> {
+pub(crate) struct Database<'db> {
     m_strings: &'db [u8],
     m_blobs: &'db [u8],
     m_guids: &'db [u8],
-    pub(crate) m_tables: Tables<'db>
+    m_tables: Tables<'db>
 }
 
 pub fn is_database<P: AsRef<Path>>(path: P) -> io::Result<bool> {
@@ -478,7 +478,7 @@ impl<'db> Database<'db> {
         <Self as TableAccess<'db, T>>::get_table_info(self)
     }
 
-    pub fn get_table<T: schema::TableRow>(&'db self) -> Table<'db, T::Kind>
+    pub fn get_table<T: crate::TableRow>(&'db self) -> Table<'db, T::Kind>
         where Self: TableAccess<'db, T::Kind>
     {
         Table {

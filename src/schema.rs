@@ -18,7 +18,7 @@ macro_rules! table_kind {
             // unfortunately no generic associated type Row<'db> yet ...
         }
 
-        impl<'a> super::TableRowAccess for &'a $ty {
+        impl<'a> crate::TableRowAccess for &'a $ty {
             type Table = Table<'a, $ty>;
             type Out = super::rows::$ty<'a>;
 

@@ -12,22 +12,11 @@ use crate::schema::marker;
 use crate::schema::signatures::*;
 use crate::schema::flags::*;
 
-pub trait TableRow {
-    type Kind: crate::database::TableKind;
-}
-
-pub trait TableRowAccess {
-    type Table;
-    type Out: TableRow;
-
-    fn get(table: Self::Table, row: u32) -> Self::Out;
-}
-
 macro_rules! row_type {
     ($ty:ident) => {
         pub struct $ty<'db>(pub(crate) Row<'db, schema::marker::$ty>);
 
-        impl<'db> schema::TableRow for $ty<'db> {
+        impl<'db> crate::TableRow for $ty<'db> {
             type Kind = schema::marker::$ty;
         }
     }
