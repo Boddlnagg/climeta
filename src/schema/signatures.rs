@@ -1,5 +1,6 @@
 use std::io::Cursor;
 use std::fmt;
+use std::mem;
 use byteorder::ReadBytesExt;
 use crate::Result;
 use crate::database::{Database, CodedIndex};
@@ -20,15 +21,12 @@ impl<'a> ByteCursorExt for Cursor<&'a [u8]> {
 fn uncompress_unsigned(cursor: &mut Cursor<&[u8]>) -> Result<u32> {
     let first = cursor.read_u8()?;
     if (first & 0x80) == 0x00 {
-        //length = 1;
         Ok(first as u32)
     } else if (first & 0xc0) == 0x80 {
-        //length = 2;
         let mut value = ((first & 0x3f) as u32) << 8;
         value |= cursor.read_u8()? as u32;
         Ok(value)
     } else if (first & 0xe0) == 0xc0 {
-        //length = 4;
         let mut value = ((first & 0x1f) as u32) << 24;
         value |= (cursor.read_u8()? as u32) << 16;
         value |= (cursor.read_u8()? as u32) << 8;
@@ -39,26 +37,10 @@ fn uncompress_unsigned(cursor: &mut Cursor<&[u8]>) -> Result<u32> {
     }
 }
 
-/*fn uncompress_enum<T: FromPrimitive>(cursor: &mut Cursor<&[u8]>) -> Result<T> {
-    T::from_u32(uncompress_unsigned(cursor)?)
-}*/
+fn uncompress_signed(cursor: &mut Cursor<&[u8]>) -> Result<i32> {
+    unimplemented!()
+}
 
-/*#[repr(u8)]
-#[derive(FromPrimitive, ToPrimitive)]
-#[derive(Copy, Clone, Debug)]
-pub enum CallingConvention {
-    Default = 0x00,
-    VarArg = 0x05,
-    Field = 0x06,
-    LocalSig = 0x07,
-    Property = 0x08,
-    GenericInst = 0x10,
-    Mask = 0x0f,
-
-    HasThis = 0x20,
-    ExplicitThis = 0x40,
-    Generic = 0x10,
-}*/
 
 #[allow(non_upper_case_globals)]
 mod bits {
@@ -212,20 +194,35 @@ impl<'db> Array<'db> {
 
 impl<'db> fmt::Debug for Array<'db> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        // TODO: improve debug printing or remove this
+        // TODO: is this correct?
         write!(f, "{:?}[]", self.m_type)
     }
 }
 
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone)]
 pub enum TypeTag {
     Class,
     ValueType
 }
 
-// II.23.2.12
-pub enum Type<'db> {
+impl<'db> fmt::Debug for TypeTag {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            TypeTag::ValueType => write!(f, "valuetype"),
+            TypeTag::Class => write!(f, "class")
+        }
+    }
+}
+
+#[derive(Copy, Clone)]
+pub enum GenericVarScope {
+    Type,
+    Method
+}
+
+#[derive(Copy, Clone)]
+pub enum PrimitiveType {
     Boolean,
     Char,
     I1,
@@ -240,34 +237,61 @@ pub enum Type<'db> {
     R8,
     I,
     U,
+}
+
+impl fmt::Debug for PrimitiveType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        // ECMA-335, II.7.1
+        use PrimitiveType::*;
+        match *self {
+            Boolean => write!(f, "bool"),
+            Char => write!(f, "char"),
+            I1 => write!(f, "int8"),
+            U1 => write!(f, "unsigned int8"),
+            I2 => write!(f, "int16"),
+            U2 => write!(f, "unsigned int16"),
+            I4 => write!(f, "int32"),
+            U4 => write!(f, "unsigned int32"),
+            I8 => write!(f, "int64"),
+            U8 => write!(f, "unsigned int64"),
+            R4 => write!(f, "float32"),
+            R8 => write!(f, "float64"),
+            I => write!(f, "native int"),
+            U => write!(f, "native unsigned int")
+        }
+    }
+}
+
+// II.23.2.12
+pub enum Type<'db> {
+    Primitive(PrimitiveType),
     Array(Array<'db>), // for ARRAY and SZARRAY
     Ref(TypeTag, TypeDefOrRef<'db>, Option<Box<[Type<'db>]>>),
-    FnPtr, // TODO
-    MVar(u32), // TODO: maybe unify with Var and introduce GenericVarScope::{Type, Method}
+    //FnPtr, // TODO
+    GenericVar(GenericVarScope, u32),
     Object,
-    Ptr, // TODO
+    //Ptr, // TODO
     String,
-    Var(u32),
 }
 
 impl<'db> Type<'db> {
     fn parse(cur: &mut Cursor<&'db [u8]>, db: &'db Database) -> Result<Type<'db>> {
         let element_type = uncompress_unsigned(cur)?;
         Ok(match element_type as u8 {
-            bits::ELEMENT_TYPE_BOOLEAN => Type::Boolean,
-            bits::ELEMENT_TYPE_CHAR => Type::Char,
-            bits::ELEMENT_TYPE_I1 => Type::I1,
-            bits::ELEMENT_TYPE_U1 => Type::U1,
-            bits::ELEMENT_TYPE_I2 => Type::I2,
-            bits::ELEMENT_TYPE_U2 => Type::U2,
-            bits::ELEMENT_TYPE_I4 => Type::I4,
-            bits::ELEMENT_TYPE_U4 => Type::U4,
-            bits::ELEMENT_TYPE_I8 => Type::I8,
-            bits::ELEMENT_TYPE_U8 => Type::U8,
-            bits::ELEMENT_TYPE_R4 => Type::R4,
-            bits::ELEMENT_TYPE_R8 => Type::R8,
-            bits::ELEMENT_TYPE_I => Type::I,
-            bits::ELEMENT_TYPE_U => Type::U,
+            bits::ELEMENT_TYPE_BOOLEAN => Type::Primitive(PrimitiveType::Boolean),
+            bits::ELEMENT_TYPE_CHAR => Type::Primitive(PrimitiveType::Char),
+            bits::ELEMENT_TYPE_I1 => Type::Primitive(PrimitiveType::I1),
+            bits::ELEMENT_TYPE_U1 => Type::Primitive(PrimitiveType::U1),
+            bits::ELEMENT_TYPE_I2 => Type::Primitive(PrimitiveType::I2),
+            bits::ELEMENT_TYPE_U2 => Type::Primitive(PrimitiveType::U2),
+            bits::ELEMENT_TYPE_I4 => Type::Primitive(PrimitiveType::I4),
+            bits::ELEMENT_TYPE_U4 => Type::Primitive(PrimitiveType::U4),
+            bits::ELEMENT_TYPE_I8 => Type::Primitive(PrimitiveType::I8),
+            bits::ELEMENT_TYPE_U8 => Type::Primitive(PrimitiveType::U8),
+            bits::ELEMENT_TYPE_R4 => Type::Primitive(PrimitiveType::R4),
+            bits::ELEMENT_TYPE_R8 => Type::Primitive(PrimitiveType::R8),
+            bits::ELEMENT_TYPE_I => Type::Primitive(PrimitiveType::I),
+            bits::ELEMENT_TYPE_U => Type::Primitive(PrimitiveType::U),
             bits::ELEMENT_TYPE_ARRAY => unimplemented!(),
             bits::ELEMENT_TYPE_CLASS => Type::Ref(TypeTag::Class, TypeDefOrRef::decode(uncompress_unsigned(cur)?, db)?.expect("Null type in Class Type"), None),
             bits::ELEMENT_TYPE_FNPTR => unimplemented!(),
@@ -275,13 +299,13 @@ impl<'db> Type<'db> {
                 let (typetag, typ, args) = parse_generic_inst(cur, db)?;
                 Type::Ref(typetag, typ, Some(args))
             },
-            bits::ELEMENT_TYPE_MVAR => Type::MVar(uncompress_unsigned(cur)?),
+            bits::ELEMENT_TYPE_MVAR => Type::GenericVar(GenericVarScope::Method, uncompress_unsigned(cur)?),
             bits::ELEMENT_TYPE_OBJECT => Type::Object,
             bits::ELEMENT_TYPE_PTR => unimplemented!(),
             bits::ELEMENT_TYPE_STRING => Type::String,
             bits::ELEMENT_TYPE_SZARRAY => Type::Array(Array::parse_szarray(cur, db)?),
             bits::ELEMENT_TYPE_VALUETYPE => Type::Ref(TypeTag::ValueType, TypeDefOrRef::decode(uncompress_unsigned(cur)?, db)?.expect("Null type in ValueType Type"), None),
-            bits::ELEMENT_TYPE_VAR => Type::Var(uncompress_unsigned(cur)?),
+            bits::ELEMENT_TYPE_VAR => Type::GenericVar(GenericVarScope::Type, uncompress_unsigned(cur)?),
             b => return Err(format!("Unexpected element type for Type: {}", b).into())
         })
     }
@@ -319,26 +343,10 @@ impl<'db> fmt::Debug for Type<'db> {
         // ECMA-335, II.7.1
         use Type::*;
         match *self {
-            Boolean => write!(f, "bool"),
-            Char => write!(f, "char"),
-            I1 => write!(f, "int8"),
-            U1 => write!(f, "unsigned int8"),
-            I2 => write!(f, "int16"),
-            U2 => write!(f, "unsigned int16"),
-            I4 => write!(f, "int32"),
-            U4 => write!(f, "unsigned int32"),
-            I8 => write!(f, "int64"),
-            U8 => write!(f, "unsigned int64"),
-            R4 => write!(f, "float32"),
-            R8 => write!(f, "float64"),
-            I => write!(f, "native int"),
-            U => write!(f, "native unsigned int"),
+            Primitive(prim) => write!(f, "{:?}", prim),
             Array(ref array) => write!(f, "{:?}[]", array.elem_type()), // TODO: array shape?
             Ref(tag, ref t, ref generic) => {
-                match tag {
-                    TypeTag::ValueType => write!(f, "valuetype "),
-                    TypeTag::Class => write!(f, "class ")
-                }?;
+                write!(f, "{:?}", tag)?;
                 fmt_typedeforref(t, f)?;
                 if let Some(g) = generic {
                     write!(f, "<")?;
@@ -352,11 +360,9 @@ impl<'db> fmt::Debug for Type<'db> {
                 }
                 Ok(())
             }
-            FnPtr => unimplemented!(), // TODO
-            Var(n) => write!(f, "!{}", n),
-            MVar(n) => write!(f, "!!{}", n),
+            GenericVar(GenericVarScope::Type, n) => write!(f, "!{}", n),
+            GenericVar(GenericVarScope::Method, n) => write!(f, "!!{}", n),
             Object => write!(f, "object"),
-            Ptr => unimplemented!(), // TODO
             String => write!(f, "string")
         }
     }
@@ -400,7 +406,7 @@ impl<'db> RetType<'db> {
             bits::ELEMENT_TYPE_BYREF => RetTypeKind::TypeByRef(Type::parse(cur, db)?),
             bits::ELEMENT_TYPE_TYPEDBYREF => RetTypeKind::TypedReference,
             _ => {
-                std::mem::swap(cur, &mut cur_clone); // rewind cursor
+                mem::swap(cur, &mut cur_clone); // rewind cursor
                 RetTypeKind::Type(Type::parse(cur, db)?)
             }
         };
@@ -455,7 +461,7 @@ impl<'db> ParamSig<'db> {
             bits::ELEMENT_TYPE_BYREF => ParamKind::TypeByRef(Type::parse(cur, db)?),
             bits::ELEMENT_TYPE_TYPEDBYREF => ParamKind::TypedReference,
             _ => {
-                std::mem::swap(cur, &mut cur_clone); // rewind cursor
+                mem::swap(cur, &mut cur_clone); // rewind cursor
                 ParamKind::Type(Type::parse(cur, db)?)
             }
         };
@@ -498,7 +504,7 @@ impl<'db> CustomMod<'db> {
                 bits::ELEMENT_TYPE_CMOD_OPT => CustomModTag::Optional,
                 bits::ELEMENT_TYPE_CMOD_REQD => CustomModTag::Required,
                 _ => {
-                    std::mem::swap(cur, &mut cur_clone); // rewind cursor
+                    mem::swap(cur, &mut cur_clone); // rewind cursor
                     break
                 }
             };

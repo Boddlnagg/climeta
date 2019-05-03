@@ -15,8 +15,7 @@ pub struct TableInfo<'db, T> {
 }
 
 impl<'db, T> TableInfo<'db, T> {
-    pub(crate) fn set_columns<Tuple>(&mut self, tup: Tuple) where T: TableDesc<Columns=Tuple>, Tuple: ColumnTuple
-    {
+    pub(crate) fn set_columns<Tuple>(&mut self, tup: Tuple) where T: TableDesc<Columns=Tuple>, Tuple: ColumnTuple {
         assert!(self.m_row_size == 0);
         self.m_row_size = tup.row_size();
         tup.init(&mut self.m_columns);
@@ -31,8 +30,7 @@ impl<'db, T> TableInfo<'db, T> {
         if self.m_row_count < (1 << 16) { DynamicSize::Size2 } else { DynamicSize::Size4 }
     }
 
-    pub(crate) fn set_data(&mut self, view: &'db [u8]) -> &'db [u8]
-    {
+    pub(crate) fn set_data(&mut self, view: &'db [u8]) -> &'db [u8] {
         assert!(self.m_data.is_none());
 
         if self.m_row_count > 0 {
@@ -87,8 +85,7 @@ impl<'db, T: TableKind> Table<'db, T> where &'db T: TableRowAccess<Table=Self> {
         Ok(V::read_value(input, data_size))
     }
 
-    pub fn get_row(&self, row: u32) -> Result<<&'db T as TableRowAccess>::Out>
-    {
+    pub fn get_row(&self, row: u32) -> Result<<&'db T as TableRowAccess>::Out> {
         if row > self.size() {
             return Err("Invalid row index".into());
         }
