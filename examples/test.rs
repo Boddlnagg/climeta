@@ -1,5 +1,5 @@
 use climeta::database;
-use climeta::schema::{RetTypeKind, TypeSig, TypeDef, TypeDefOrRef};
+use climeta::schema::{RetTypeKind, TypeSig, TypeSpec, TypeDef, TypeDefOrRef};
 
 fn print_typedef(row: &TypeDef) -> Result<(), Box<std::error::Error>> {
     println!("{}.{} ({:?})", row.type_namespace()?, row.type_name()?, row.flags()?.semantics());
@@ -53,6 +53,11 @@ fn main() -> Result<(), Box<std::error::Error>> {
         print_typedef(&row)?;
     }
     println!("TOTAL: {} == {}", typedefs.size(), typedefs.iter().count());
+
+    // println!("Typespecs:");
+    // for ts in db.get_table::<TypeSpec>() {
+    //     println!("- {:?}", ts.signature()?);
+    // }
 
     // for cons in db.get_table::<schema::Constant>() {
     //     let parent = cons.parent()?;

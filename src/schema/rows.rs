@@ -1,3 +1,5 @@
+use std::io::Cursor;
+
 use num_traits::FromPrimitive;
 use byteorder::{ByteOrder, LittleEndian};
 
@@ -206,7 +208,8 @@ impl<'db> MethodDef<'db> {
     }
 
     pub fn signature(&self) -> Result<MethodDefSig> {
-        MethodDefSig::decode(self.0.get_blob::<Col4>()?, self.0.get_db())
+        let mut cursor = Cursor::new(self.0.get_blob::<Col4>()?);
+        MethodDefSig::parse(&mut cursor, self.0.get_db())
     }
 
     pub fn param_list(&self) -> Result<TableRowIterator<'db, marker::Param>> {
@@ -259,5 +262,12 @@ impl<'db> TypeRef<'db> {
 
     pub fn type_namespace(&self) -> Result<&'db str> {
         self.0.get_string::<Col2>()
+    }
+}
+
+impl<'db> TypeSpec<'db> {
+    pub fn signature(&self) -> Result<TypeSpecSig> {
+        let mut cursor = Cursor::new(self.0.get_blob::<Col0>()?);
+        TypeSpecSig::parse(&mut cursor, self.0.get_db())
     }
 }
