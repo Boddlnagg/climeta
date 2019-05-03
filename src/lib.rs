@@ -6,16 +6,16 @@ use std::fs::File;
 use std::path::Path;
 use std::ops::Deref;
 
-
 mod core;
-mod database; // TODO: move into core
+
+use crate::core::db;
 
 pub mod schema;
 
 type Result<T> = ::std::result::Result<T, Box<std::error::Error>>; // TODO: better error type
 
 pub use crate::core::table::Table;
-pub use crate::database::is_database;
+pub use db::is_database;
 
 
 // our own little copy of owning_ref::OwningHandle where the H: Deref bound is dropped
@@ -78,12 +78,12 @@ unsafe impl StableDeref for StableMmap {}
 
 // Separate type because enum variants are always public
 enum DatabaseInner<'db> {
-    Owned(OwningHandle<StableMmap, database::Database<'db>>),
-    Borrowed(database::Database<'db>)
+    Owned(OwningHandle<StableMmap, db::Database<'db>>),
+    Borrowed(db::Database<'db>)
 }
 
 impl<'db> Deref for DatabaseInner<'db> {
-    type Target = database::Database<'db>;
+    type Target = db::Database<'db>;
     fn deref(&self) -> &Self::Target {
         use DatabaseInner::*;
         match self {
@@ -157,12 +157,12 @@ impl<'db> Database<'db> {
         let file = File::open(path.as_ref())?;
         let mmap = StableMmap(unsafe { Mmap::map(&file)? });
         Ok(Database(DatabaseInner::Owned(
-            OwningHandle::try_new(mmap, |ptr: *const [u8]| unsafe { database::Database::load(&(*ptr)[..]) })?
+            OwningHandle::try_new(mmap, |ptr: *const [u8]| unsafe { db::Database::load(&(*ptr)[..]) })?
         )))
     }
 
     pub fn from_data<'a>(data: &'a [u8]) -> Result<Database<'a>> {
-        Ok(Database(DatabaseInner::Borrowed(database::Database::load(data)?)))
+        Ok(Database(DatabaseInner::Borrowed(db::Database::load(data)?)))
     }
 
     pub fn table<T: TableRow>(&'db self) -> Table<'db, T::Kind>
@@ -173,7 +173,7 @@ impl<'db> Database<'db> {
 }
 
 pub trait TableRow {
-    type Kind: crate::database::TableKind;
+    type Kind: db::TableKind;
 }
 
 pub trait TableRowAccess {

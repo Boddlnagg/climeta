@@ -1,5 +1,6 @@
 use num_traits::FromPrimitive;
 
+pub(crate) mod db;
 pub(crate) mod table;
 pub(crate) mod pe;
 pub(crate) mod columns;

@@ -1,4 +1,4 @@
-use crate::database::{Database, Tables, CodedIndex};
+use crate::core::db::{Database, Tables, CodedIndex};
 use crate::Result;
 
 use crate::core::columns::DynamicSize;
@@ -35,7 +35,7 @@ macro_rules! table_kind {
 
 pub mod marker {
     use crate::core::table::{Table, Row};
-    use crate::database::{TableKind, TableDesc};
+    use crate::core::db::{TableKind, TableDesc};
     use crate::core::columns::{FixedSize2, FixedSize4, FixedSize8, DynamicSize};
 
     table_kind!(Assembly [FixedSize4, FixedSize8, FixedSize4, DynamicSize, DynamicSize, DynamicSize]);

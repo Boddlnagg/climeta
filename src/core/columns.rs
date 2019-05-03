@@ -1,6 +1,6 @@
 use byteorder::{ByteOrder, LittleEndian};
 
-use crate::database::TableDesc;
+use super::db::TableDesc;
 
 pub(crate) trait ColumnIndex { fn idx() -> usize; }
 

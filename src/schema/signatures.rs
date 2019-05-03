@@ -3,7 +3,7 @@ use std::fmt;
 use std::mem;
 use byteorder::ReadBytesExt;
 use crate::Result;
-use crate::database::{Database, CodedIndex};
+use crate::core::db::{Database, CodedIndex};
 use super::TypeDefOrRef;
 
 trait ByteCursorExt {
@@ -101,7 +101,6 @@ mod bits {
 pub struct MethodDefSig<'db> {
     m_initial_byte: u8,
     m_generic_param_count: u32,
-    m_param_count: u32,
     m_ret_type: RetType<'db>,
     m_params: Box<[ParamSig<'db>]>, // TODO: iterator?
 }
@@ -128,7 +127,6 @@ impl<'db> MethodDefSig<'db> {
         Ok(MethodDefSig {
             m_initial_byte: initial_byte,
             m_generic_param_count: generic_param_count,
-            m_param_count: param_count,
             m_ret_type: ret_type,
             m_params: params.into_boxed_slice()
         })

@@ -1,5 +1,4 @@
-use crate::database::{TableDesc, TableKind, Database};
-use crate::database;
+use crate::core::db::{self, TableDesc, TableKind, Database};
 use crate::{TableRow, TableRowAccess};
 use crate::Result;
 
@@ -61,7 +60,7 @@ impl<'db, T> Default for TableInfo<'db, T> {
 pub struct Table<'db, T: TableKind> {
     // TODO: we could potentially derive the Database location statically from the
     //       TableInfo pointer, with some unsafe code ... not sure whether that's worth it
-    pub(crate) db: &'db database::Database<'db>,
+    pub(crate) db: &'db db::Database<'db>,
     pub(crate) table: &'db TableInfo<'db, T>,
 }
 
@@ -196,14 +195,14 @@ impl<'db, T: TableKind> Row<'db, T> where &'db T: TableRowAccess<Table=Table<'db
         self.m_table.db.get_blob(self.get_value::<Col, _>()?)
     }
 
-    pub(crate) fn get_coded_index<Col: ColumnIndex, Target: database::CodedIndex<Database=&'db Database<'db>>>(&self) -> Result<Option<Target>>
+    pub(crate) fn get_coded_index<Col: ColumnIndex, Target: db::CodedIndex<Database=&'db Database<'db>>>(&self) -> Result<Option<Target>>
         where T: ColumnAccess<Col>, u32: ReadValue<T::ColumnSize>
     {
         Target::decode(self.get_value::<Col, _>()?, self.m_table.db)
     }
 
     pub(crate) fn get_list<Col: ColumnIndex, Target: TableKind>(&self) -> Result<TableRowIterator<'db, Target>>
-        where database::Database<'db>: database::TableAccess<'db, Target>,
+        where db::Database<'db>: db::TableAccess<'db, Target>,
               T: ColumnAccess<Col>, u32: ReadValue<T::ColumnSize>,
               &'db Target: TableRowAccess<Table=Table<'db, Target>>,
               <&'db Target as TableRowAccess>::Out: TableRow<Kind=Target>,
@@ -230,7 +229,7 @@ impl<'db, T: TableKind> Row<'db, T> where &'db T: TableRowAccess<Table=Table<'db
     }
 
     pub(crate) fn get_target_row<Col: ColumnIndex, Target: TableKind>(&self)  -> Result<<&'db Target as TableRowAccess>::Out>
-        where database::Database<'db>: database::TableAccess<'db, Target>,
+        where db::Database<'db>: db::TableAccess<'db, Target>,
               T: ColumnAccess<Col>, u32: ReadValue<T::ColumnSize>,
               &'db Target: TableRowAccess<Table=Table<'db, Target>>,
               <&'db Target as TableRowAccess>::Out: TableRow<Kind=Target>
