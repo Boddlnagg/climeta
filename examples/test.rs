@@ -1,5 +1,5 @@
 use climeta::database;
-use climeta::schema::{RetTypeKind, TypeSig, TypeSpec, TypeDef, TypeDefOrRef};
+use climeta::schema::{RetTypeKind, Type, TypeSpec, TypeDef, TypeDefOrRef};
 
 fn print_typedef(row: &TypeDef) -> Result<(), Box<std::error::Error>> {
     println!("{}.{} ({:?})", row.type_namespace()?, row.type_name()?, row.flags()?.semantics());
@@ -22,7 +22,7 @@ fn print_typedef(row: &TypeDef) -> Result<(), Box<std::error::Error>> {
         
         let ret = sig.return_type().kind();
         match ret {
-            RetTypeKind::Type(TypeSig::Ref(_, TypeDefOrRef::TypeRef(t), _)) => println!("   - R {}.{}", t.type_namespace()?, t.type_name()?),
+            RetTypeKind::Type(Type::Ref(_, TypeDefOrRef::TypeRef(t), _)) => println!("   - R {}.{}", t.type_namespace()?, t.type_name()?),
             _ => println!("   - R {:?}", ret)
         }
     }

@@ -182,10 +182,10 @@ impl<'db> MethodDefSig<'db> {
 
 // TODO: impl Debug for MethodDefSig (s.a. II.15.3)
 
-// TODO: this could also internally be Box<(TypeSig, [CustomMod])>,
+// TODO: this could also internally be Box<(Type, [CustomMod])>,
 //       where the tuple is dynamically sized, to have only one dynamic allocation
 pub struct Array<'db> {
-    m_type: Box<TypeSig<'db>>,
+    m_type: Box<Type<'db>>,
     m_cmod: Vec<CustomMod<'db>>
     // TODO: optional ArrayShape
 }
@@ -195,12 +195,12 @@ impl<'db> Array<'db> {
         // ELEMENT_TYPE_SZARRAY already consumed
         let cmod = CustomMod::parse(cur, db)?;
         Ok(Array {
-            m_type: Box::new(TypeSig::parse(cur, db)?),
+            m_type: Box::new(Type::parse(cur, db)?),
             m_cmod: cmod
         })
     }
 
-    pub fn elem_type(&self) -> &TypeSig<'db> {
+    pub fn elem_type(&self) -> &Type<'db> {
         &self.m_type
     }
 
@@ -224,8 +224,8 @@ pub enum TypeTag {
     ValueType
 }
 
-
-pub enum TypeSig<'db> {
+// II.23.2.12
+pub enum Type<'db> {
     Boolean,
     Char,
     I1,
@@ -241,7 +241,7 @@ pub enum TypeSig<'db> {
     I,
     U,
     Array(Array<'db>), // for ARRAY and SZARRAY
-    Ref(TypeTag, TypeDefOrRef<'db>, Option<Box<[TypeSig<'db>]>>),
+    Ref(TypeTag, TypeDefOrRef<'db>, Option<Box<[Type<'db>]>>),
     FnPtr, // TODO
     MVar(u32), // TODO: maybe unify with Var and introduce GenericVarScope::{Type, Method}
     Object,
@@ -250,44 +250,44 @@ pub enum TypeSig<'db> {
     Var(u32),
 }
 
-impl<'db> TypeSig<'db> {
-    fn parse(cur: &mut Cursor<&'db [u8]>, db: &'db Database) -> Result<TypeSig<'db>> {
+impl<'db> Type<'db> {
+    fn parse(cur: &mut Cursor<&'db [u8]>, db: &'db Database) -> Result<Type<'db>> {
         let element_type = uncompress_unsigned(cur)?;
         Ok(match element_type as u8 {
-            bits::ELEMENT_TYPE_BOOLEAN => TypeSig::Boolean,
-            bits::ELEMENT_TYPE_CHAR => TypeSig::Char,
-            bits::ELEMENT_TYPE_I1 => TypeSig::I1,
-            bits::ELEMENT_TYPE_U1 => TypeSig::U1,
-            bits::ELEMENT_TYPE_I2 => TypeSig::I2,
-            bits::ELEMENT_TYPE_U2 => TypeSig::U2,
-            bits::ELEMENT_TYPE_I4 => TypeSig::I4,
-            bits::ELEMENT_TYPE_U4 => TypeSig::U4,
-            bits::ELEMENT_TYPE_I8 => TypeSig::I8,
-            bits::ELEMENT_TYPE_U8 => TypeSig::U8,
-            bits::ELEMENT_TYPE_R4 => TypeSig::R4,
-            bits::ELEMENT_TYPE_R8 => TypeSig::R8,
-            bits::ELEMENT_TYPE_I => TypeSig::I,
-            bits::ELEMENT_TYPE_U => TypeSig::U,
+            bits::ELEMENT_TYPE_BOOLEAN => Type::Boolean,
+            bits::ELEMENT_TYPE_CHAR => Type::Char,
+            bits::ELEMENT_TYPE_I1 => Type::I1,
+            bits::ELEMENT_TYPE_U1 => Type::U1,
+            bits::ELEMENT_TYPE_I2 => Type::I2,
+            bits::ELEMENT_TYPE_U2 => Type::U2,
+            bits::ELEMENT_TYPE_I4 => Type::I4,
+            bits::ELEMENT_TYPE_U4 => Type::U4,
+            bits::ELEMENT_TYPE_I8 => Type::I8,
+            bits::ELEMENT_TYPE_U8 => Type::U8,
+            bits::ELEMENT_TYPE_R4 => Type::R4,
+            bits::ELEMENT_TYPE_R8 => Type::R8,
+            bits::ELEMENT_TYPE_I => Type::I,
+            bits::ELEMENT_TYPE_U => Type::U,
             bits::ELEMENT_TYPE_ARRAY => unimplemented!(),
-            bits::ELEMENT_TYPE_CLASS => TypeSig::Ref(TypeTag::Class, TypeDefOrRef::decode(uncompress_unsigned(cur)?, db)?.expect("Null type in Class TypeSig"), None),
+            bits::ELEMENT_TYPE_CLASS => Type::Ref(TypeTag::Class, TypeDefOrRef::decode(uncompress_unsigned(cur)?, db)?.expect("Null type in Class Type"), None),
             bits::ELEMENT_TYPE_FNPTR => unimplemented!(),
             bits::ELEMENT_TYPE_GENERICINST => {
                 let (typetag, typ, args) = parse_generic_inst(cur, db)?;
-                TypeSig::Ref(typetag, typ, Some(args))
+                Type::Ref(typetag, typ, Some(args))
             },
-            bits::ELEMENT_TYPE_MVAR => TypeSig::MVar(uncompress_unsigned(cur)?),
-            bits::ELEMENT_TYPE_OBJECT => TypeSig::Object,
+            bits::ELEMENT_TYPE_MVAR => Type::MVar(uncompress_unsigned(cur)?),
+            bits::ELEMENT_TYPE_OBJECT => Type::Object,
             bits::ELEMENT_TYPE_PTR => unimplemented!(),
-            bits::ELEMENT_TYPE_STRING => TypeSig::String,
-            bits::ELEMENT_TYPE_SZARRAY => TypeSig::Array(Array::parse_szarray(cur, db)?),
-            bits::ELEMENT_TYPE_VALUETYPE => TypeSig::Ref(TypeTag::ValueType, TypeDefOrRef::decode(uncompress_unsigned(cur)?, db)?.expect("Null type in ValueType TypeSig"), None),
-            bits::ELEMENT_TYPE_VAR => TypeSig::Var(uncompress_unsigned(cur)?),
-            b => return Err(format!("Unexpected element type for TypeSig: {}", b).into())
+            bits::ELEMENT_TYPE_STRING => Type::String,
+            bits::ELEMENT_TYPE_SZARRAY => Type::Array(Array::parse_szarray(cur, db)?),
+            bits::ELEMENT_TYPE_VALUETYPE => Type::Ref(TypeTag::ValueType, TypeDefOrRef::decode(uncompress_unsigned(cur)?, db)?.expect("Null type in ValueType Type"), None),
+            bits::ELEMENT_TYPE_VAR => Type::Var(uncompress_unsigned(cur)?),
+            b => return Err(format!("Unexpected element type for Type: {}", b).into())
         })
     }
 }
 
-fn parse_generic_inst<'db>(cur: &mut Cursor<&'db [u8]>, db: &'db Database) -> Result<(TypeTag, TypeDefOrRef<'db>, Box<[TypeSig<'db>]>)> {
+fn parse_generic_inst<'db>(cur: &mut Cursor<&'db [u8]>, db: &'db Database) -> Result<(TypeTag, TypeDefOrRef<'db>, Box<[Type<'db>]>)> {
     let typetag = match uncompress_unsigned(cur)? as u8 {
         bits::ELEMENT_TYPE_CLASS => TypeTag::Class,
         bits::ELEMENT_TYPE_VALUETYPE => TypeTag::ValueType,
@@ -298,7 +298,7 @@ fn parse_generic_inst<'db>(cur: &mut Cursor<&'db [u8]>, db: &'db Database) -> Re
     let arg_count = uncompress_unsigned(cur)?;
     let mut args = Vec::with_capacity(arg_count as usize);
     for _ in 0..arg_count {
-        args.push(TypeSig::parse(cur, db)?);
+        args.push(Type::parse(cur, db)?);
     }
 
     Ok((typetag, typ, args.into_boxed_slice()))
@@ -314,10 +314,10 @@ fn fmt_typedeforref<'db>(t: &TypeDefOrRef<'db>, f: &mut fmt::Formatter) -> fmt::
     }
 }
 
-impl<'db> fmt::Debug for TypeSig<'db> {
+impl<'db> fmt::Debug for Type<'db> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         // ECMA-335, II.7.1
-        use TypeSig::*;
+        use Type::*;
         match *self {
             Boolean => write!(f, "bool"),
             Char => write!(f, "char"),
@@ -364,8 +364,8 @@ impl<'db> fmt::Debug for TypeSig<'db> {
 
 pub enum RetTypeKind<'db> {
     Void,
-    Type(TypeSig<'db>),
-    TypeByRef(TypeSig<'db>),
+    Type(Type<'db>),
+    TypeByRef(Type<'db>),
     TypedReference // System.TypedReference
 }
 
@@ -397,11 +397,11 @@ impl<'db> RetType<'db> {
         let element_type = uncompress_unsigned(cur)?;
         let kind = match element_type as u8 {
             bits::ELEMENT_TYPE_VOID => RetTypeKind::Void,
-            bits::ELEMENT_TYPE_BYREF => RetTypeKind::TypeByRef(TypeSig::parse(cur, db)?),
+            bits::ELEMENT_TYPE_BYREF => RetTypeKind::TypeByRef(Type::parse(cur, db)?),
             bits::ELEMENT_TYPE_TYPEDBYREF => RetTypeKind::TypedReference,
             _ => {
                 std::mem::swap(cur, &mut cur_clone); // rewind cursor
-                RetTypeKind::Type(TypeSig::parse(cur, db)?)
+                RetTypeKind::Type(Type::parse(cur, db)?)
             }
         };
 
@@ -421,8 +421,8 @@ impl<'db> RetType<'db> {
 }
 
 pub enum ParamKind<'db> {
-    Type(TypeSig<'db>),
-    TypeByRef(TypeSig<'db>),
+    Type(Type<'db>),
+    TypeByRef(Type<'db>),
     TypedReference // System.TypedReference
 }
 
@@ -452,11 +452,11 @@ impl<'db> ParamSig<'db> {
         let mut cur_clone = cur.clone(); // maybe we need to rewind
         let element_type = uncompress_unsigned(cur)?;
         let kind = match element_type as u8 {
-            bits::ELEMENT_TYPE_BYREF => ParamKind::TypeByRef(TypeSig::parse(cur, db)?),
+            bits::ELEMENT_TYPE_BYREF => ParamKind::TypeByRef(Type::parse(cur, db)?),
             bits::ELEMENT_TYPE_TYPEDBYREF => ParamKind::TypedReference,
             _ => {
                 std::mem::swap(cur, &mut cur_clone); // rewind cursor
-                ParamKind::Type(TypeSig::parse(cur, db)?)
+                ParamKind::Type(Type::parse(cur, db)?)
             }
         };
 
@@ -522,7 +522,7 @@ impl<'db> CustomMod<'db> {
 
 // II.23.2.14 (renamed to prevent name clash with TypeSpec table row)
 pub enum TypeSpecSig<'db> {
-    GenericInst(TypeTag, TypeDefOrRef<'db>, Box<[TypeSig<'db>]>)
+    GenericInst(TypeTag, TypeDefOrRef<'db>, Box<[Type<'db>]>)
 }
 
 impl<'db> TypeSpecSig<'db> {
@@ -544,7 +544,7 @@ impl<'db> TypeSpecSig<'db> {
 
 impl<'db> fmt::Debug for TypeSpecSig<'db> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        // compare impl Debug for TypeSig
+        // compare impl Debug for Type
         match *self {
             TypeSpecSig::GenericInst(tag, ref t, ref generic) => {
                 match tag {
