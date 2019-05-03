@@ -345,7 +345,7 @@ impl<'db> fmt::Debug for Type<'db> {
             Primitive(prim) => write!(f, "{:?}", prim),
             Array(ref array) => write!(f, "{:?}[]", array.elem_type()), // TODO: array shape?
             Ref(tag, ref t, ref generic) => {
-                write!(f, "{:?}", tag)?;
+                write!(f, "{:?} ", tag)?;
                 fmt_typedeforref(t, f)?;
                 if let Some(g) = generic {
                     write!(f, "<")?;
@@ -552,10 +552,7 @@ impl<'db> fmt::Debug for TypeSpecSig<'db> {
         // compare impl Debug for Type
         match *self {
             TypeSpecSig::GenericInst(tag, ref t, ref generic) => {
-                match tag {
-                    TypeTag::ValueType => write!(f, "valuetype "),
-                    TypeTag::Class => write!(f, "class ")
-                }?;
+                write!(f, "{:?} ", tag)?;
                 fmt_typedeforref(t, f)?;
                 write!(f, "<")?;
                 let mut first = true;
