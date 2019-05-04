@@ -186,6 +186,19 @@ impl<'db> Cache<'db> {
         let map = self.namespace_map.borrow();
         map.get(type_namespace).and_then(|ns| ns.types.get(type_name).map(|t| t.clone()))
     }
+
+    pub fn iter(&'db self) -> elsa::vec::Iter<'db, Box<Database<'db>>> {
+        self.into_iter()
+    }
+}
+
+impl<'db> IntoIterator for &'db Cache<'db> {
+    type Item = &'db Database<'db>;
+    type IntoIter = elsa::vec::Iter<'db, Box<Database<'db>>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.databases.into_iter()
+    }
 }
 
 #[derive(Default)]
