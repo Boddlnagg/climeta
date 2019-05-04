@@ -1,3 +1,5 @@
+use std::fmt;
+
 use crate::{Result, Cache, ResolveToTypeDef};
 
 use crate::core::db::{Database, Tables, CodedIndex};
@@ -273,20 +275,43 @@ pub enum ConstantType {
     Class = 0x12
 }
 
-#[derive(Debug, Copy, Clone)]
-pub enum ConstantValue<'db> {
+// ECMA-335, II.16.2
+#[derive(Copy, Clone)]
+pub enum FieldInit<'db> {
     Boolean(bool),
     Char(u16),
     Int8(i8),
     UInt8(u8),
     Int16(i16),
     UInt16(u16),
-    Int32(i32) ,
+    Int32(i32),
     UInt32(u32),
     Int64(i64),
     UInt64(u64),
     Float32(f32),
     Float64(f64),
     String(Option<&'db str>),
-    Class
+    NullRef
+}
+
+impl<'db> fmt::Debug for FieldInit<'db> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use FieldInit::*;
+        match self {
+            Boolean(v) => write!(f, "bool({})", v),
+            Char(v) => write!(f, "char({})", v),
+            Int8(v) => write!(f, "int8({})", v),
+            UInt8(v) => write!(f, "unsigned int8({})", v),
+            Int16(v) => write!(f, "int16({})", v),
+            UInt16(v) => write!(f, "unsigned int16({})", v),
+            Int32(v) => write!(f, "int32({})", v),
+            UInt32(v) => write!(f, "unsigned int32({})", v),
+            Int64(v) => write!(f, "int64({})", v),
+            UInt64(v) => write!(f, "unsigned int64({})", v),
+            Float32(v) => write!(f, "float32({})", v),
+            Float64(v) => write!(f, "float64({})", v),
+            String(Some(v)) => write!(f, "{:?}", v),
+            NullRef | String(None) => write!(f, "nullref"),
+        }
+    }
 }

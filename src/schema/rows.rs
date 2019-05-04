@@ -90,9 +90,9 @@ impl<'db> Constant<'db> {
         self.0.get_coded_index::<Col1, super::HasConstant>()
     }
 
-    pub fn value(&self) -> Result<super::ConstantValue> {
+    pub fn value(&self) -> Result<super::FieldInit> {
         use super::ConstantType;
-        use super::ConstantValue::*;
+        use super::FieldInit::*;
         let bytes = self.0.get_blob::<Col2>()?;
         Ok(match self.type_()? {
             ConstantType::Boolean => Boolean(bytes[0] != 0),
@@ -116,7 +116,7 @@ impl<'db> Constant<'db> {
             },
             ConstantType::Class => {
                 assert_eq!(LittleEndian::read_u32(bytes), 0);
-                Class // nullref
+                NullRef
             }
         })
     }
