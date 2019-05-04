@@ -14,6 +14,7 @@ use crate::schema::flags::*;
 
 macro_rules! row_type {
     ($ty:ident) => {
+        #[derive(Clone)]
         pub struct $ty<'db>(pub(crate) Row<'db, schema::marker::$ty>);
 
         impl<'db> crate::TableRow for $ty<'db> {

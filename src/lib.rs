@@ -1,10 +1,13 @@
 #[macro_use] extern crate num_derive;
 use memmap::Mmap;
 use stable_deref_trait::StableDeref;
+use elsa::FrozenVec;
 
 use std::fs::File;
 use std::path::Path;
 use std::ops::Deref;
+use std::collections::HashMap;
+use std::cell::RefCell;
 
 mod core;
 
@@ -181,4 +184,50 @@ pub trait TableRowAccess {
     type Out: TableRow;
 
     fn get(table: Self::Table, row: u32) -> Self::Out;
+}
+
+#[derive(Default)]
+pub struct Cache<'db> {
+    databases: FrozenVec<Box<Database<'db>>>,
+    namespace_map: RefCell<HashMap<&'db str, MemberCache<'db>>>
+}
+
+impl<'db> Cache<'db> {
+    pub fn new() -> Cache<'db> {
+        Cache {
+            databases: FrozenVec::new(),
+            namespace_map: RefCell::new(HashMap::new())
+        }
+    }
+
+    pub fn insert(&'db self, database: Database<'db>) -> &'db Database<'db> {
+        use std::collections::hash_map::Entry::*;
+
+        let idx = self.databases.len();
+        self.databases.push(Box::new(database));
+        let db = &self.databases[idx];
+        for typ in db.table::<schema::TypeDef>() {
+            // if !type.flags().windows_runtime() {
+            //     continue;
+            // }
+
+            let mut map = self.namespace_map.borrow_mut();
+            let members = map.entry(typ.type_namespace().expect("unable to read namespace")).or_insert(MemberCache::default());
+            match members.types.entry(typ.type_name().expect("unable to read type name")) {
+                Occupied(_) => {},
+                Vacant(e) => { e.insert(typ.clone()); }
+            }
+        }
+        db
+    }
+
+    pub fn find(&'db self, type_namespace: &str, type_name: &str) -> Option<schema::TypeDef<'db>> {
+        let map = self.namespace_map.borrow();
+        map.get(type_namespace).and_then(|ns| ns.types.get(type_name).map(|t| t.clone()))
+    }
+}
+
+#[derive(Default)]
+struct MemberCache<'db> {
+    types: HashMap<&'db str, schema::TypeDef<'db>>,
 }

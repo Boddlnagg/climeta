@@ -110,6 +110,7 @@ impl<'db, T: TableKind> IntoIterator for Table<'db, T>
     }
 }
 
+#[derive(Clone)]
 pub(crate) struct Row<'db, T: TableKind> {
     m_table: Table<'db, T>,
     m_row: u32,

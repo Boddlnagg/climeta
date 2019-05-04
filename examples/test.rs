@@ -1,4 +1,4 @@
-use climeta::Database;
+use climeta::{Database, Cache};
 use climeta::schema::{RetTypeKind, Type, TypeDef, TypeDefOrRef};
 
 pub fn mmap_file<P: AsRef<std::path::Path>>(path: P) -> std::io::Result<memmap::Mmap> {
@@ -51,12 +51,16 @@ fn print_typedef(row: &TypeDef) -> Result<(), Box<std::error::Error>> {
 
 fn main() -> Result<(), Box<std::error::Error>> {
     println!("=== Windows.Foundation.winmd ===");
-    let db = Database::from_file("C:\\Windows\\System32\\WinMetadata\\Windows.Foundation.winmd")?;
+    let cache = Cache::new();
+    let db = cache.insert(Database::from_file("C:\\Windows\\System32\\WinMetadata\\Windows.Foundation.winmd")?);
     let typedefs = db.table::<TypeDef>();
     for row in typedefs {
         print_typedef(&row)?;
     }
     println!("TOTAL: {} == {}", typedefs.size(), typedefs.iter().count());
+    println!("Looking for Windows.Foundation.Point ...");
+    print_typedef(&cache.find("Windows.Foundation", "Point").unwrap())?;
+
 
     // println!("Typespecs:");
     // for ts in db.get_table::<TypeSpec>() {
@@ -84,14 +88,13 @@ fn main() -> Result<(), Box<std::error::Error>> {
     // }
     
     println!("=== Windows.UI.Xaml.winmd ===");
-    let f2 = mmap_file("C:\\Windows\\System32\\WinMetadata\\Windows.UI.Xaml.winmd").unwrap();
-    let db = Database::from_data(&f2).unwrap();
-    let typedefs = db.table::<TypeDef>();
+    let db2 = cache.insert(Database::from_file("C:\\Windows\\System32\\WinMetadata\\Windows.UI.Xaml.winmd")?);
+    //let f2 = mmap_file("C:\\Windows\\System32\\WinMetadata\\Windows.UI.Xaml.winmd").unwrap();
+    let typedefs = db2.table::<TypeDef>();
     for row in typedefs {
         //print_typedef(&row)?;
     }
 
-    //let typedefs = db.get_table::<TypeDef>();
     // for row in typedefs {
     //     println!("{}.{}", row.type_namespace()?, row.type_name()?);
 
@@ -112,6 +115,7 @@ fn main() -> Result<(), Box<std::error::Error>> {
     // }
 
     println!("TOTAL: {}", typedefs.size());
+    println!("TOTAL (Foundation): {}", db.table::<TypeDef>().size());
 
     Ok(())
 }
