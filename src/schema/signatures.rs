@@ -97,7 +97,7 @@ mod bits {
     // 0x55 (enum in custom attributes)
 }
 
-// II.23.2.1
+// ECMA-335, II.23.2.1
 pub struct MethodDefSig<'db> {
     m_initial_byte: u8,
     m_generic_param_count: u32,
@@ -261,7 +261,7 @@ impl fmt::Debug for PrimitiveType {
     }
 }
 
-// II.23.2.12
+// ECMA-335, II.23.2.12
 pub enum Type<'db> {
     Primitive(PrimitiveType),
     Array(Array<'db>), // for ARRAY and SZARRAY
@@ -388,7 +388,7 @@ impl<'db> fmt::Debug for RetTypeKind<'db> {
     }
 }
 
-// II.23.2.11
+// ECMA-335, II.23.2.11
 pub struct RetType<'db> {
     m_cmod: Vec<CustomMod<'db>>,
     m_kind: RetTypeKind<'db>,
@@ -444,7 +444,7 @@ impl<'db> fmt::Debug for ParamKind<'db> {
     }
 }
 
-// II.23.2.10 (renamed to prevent name conflict with Param table row)
+// ECMA-335, II.23.2.10 (renamed to prevent name conflict with Param table row)
 pub struct ParamSig<'db> {
     m_cmod: Vec<CustomMod<'db>>,
     m_kind: ParamKind<'db>,
@@ -486,7 +486,7 @@ pub enum CustomModTag {
     Required
 }
 
-// II.23.2.7
+// ECMA-335, II.23.2.7
 pub struct CustomMod<'db> {
     m_tag: CustomModTag,
     m_type: TypeDefOrRef<'db>
@@ -525,7 +525,7 @@ impl<'db> CustomMod<'db> {
     }
 }
 
-// II.23.2.14 (renamed to prevent name clash with TypeSpec table row)
+// ECMA-335, II.23.2.14 (renamed to prevent name clash with TypeSpec table row)
 pub enum TypeSpecSig<'db> {
     GenericInst(TypeTag, TypeDefOrRef<'db>, Box<[Type<'db>]>)
 }
