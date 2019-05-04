@@ -4,11 +4,14 @@ use stable_deref_trait::StableDeref;
 use owning_ref::OwningHandle;
 use elsa::FrozenVec;
 
-use std::fs::File;
-use std::path::Path;
-use std::ops::Deref;
-use std::collections::HashMap;
 use std::cell::RefCell;
+use std::collections::HashMap;
+use std::error::Error;
+use std::io;
+use std::fmt;
+use std::fs::File;
+use std::ops::Deref;
+use std::path::Path;
 
 mod core;
 
@@ -16,7 +19,74 @@ use crate::core::db;
 
 pub mod schema;
 
-type Result<T> = ::std::result::Result<T, Box<std::error::Error>>; // TODO: better error type
+#[derive(Debug)]
+pub struct DecodeError(&'static str);
+
+impl Error for DecodeError {}
+
+impl fmt::Display for DecodeError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl From<&'static str> for DecodeError {
+    fn from(message: &'static str) -> Self {
+        DecodeError(message)
+    }
+}
+
+impl From<io::Error> for DecodeError {
+    // this should happen only when reading from &[u8], and
+    // and the only possible error is an UnexpectedEof
+    fn from(error: io::Error) -> Self {
+        assert!(error.kind() == io::ErrorKind::UnexpectedEof);
+        DecodeError("trying to read beyond end of slice")
+    }
+}
+
+#[derive(Debug)]
+pub enum LoadDatabaseError {
+    IoError(io::Error),
+    DecodeError(DecodeError)
+}
+
+impl Error for LoadDatabaseError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        use LoadDatabaseError::*;
+        match self {
+            IoError(ref err) => Some(err),
+            DecodeError(ref err) => Some(err)
+        }
+    }
+}
+
+
+impl fmt::Display for LoadDatabaseError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use LoadDatabaseError::*;
+        match self {
+            IoError(e) => write!(f, "I/O error: {}", e),
+            DecodeError(e) => write!(f, "decode error: {}", e)
+        }
+        
+    }
+}
+
+impl From<io::Error> for LoadDatabaseError {
+    fn from(error: io::Error) -> Self {
+        LoadDatabaseError::IoError(error)
+    }
+}
+
+impl From<DecodeError> for LoadDatabaseError {
+    fn from(error: DecodeError) -> Self {
+        LoadDatabaseError::DecodeError(error)
+    }
+}
+
+
+type Result<T> = std::result::Result<T, DecodeError>;
 
 pub use crate::core::table::Table;
 
@@ -116,7 +186,7 @@ impl_table_access!(GenericParam);
 impl_table_access!(MethodSpec);
 
 impl<'db> Database<'db> {
-    pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Database<'db>> {
+    pub fn from_file<P: AsRef<Path>>(path: P) -> std::result::Result<Database<'db>, LoadDatabaseError> {
         let file = File::open(path.as_ref())?;
         let mmap = StableMmap(unsafe { Mmap::map(&file)? });
         Ok(Database(DatabaseInner::Owned(
@@ -134,7 +204,7 @@ impl<'db> Database<'db> {
         self.get_table()
     }
 
-    pub fn is_database<P: AsRef<Path>>(path: P) -> std::io::Result<bool> {
+    pub fn is_database<P: AsRef<Path>>(path: P) -> io::Result<bool> {
         db::is_database(path)
     }
 }

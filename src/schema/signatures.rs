@@ -305,7 +305,7 @@ impl<'db> Type<'db> {
             bits::ELEMENT_TYPE_SZARRAY => Type::Array(Array::parse_szarray(cur, db)?),
             bits::ELEMENT_TYPE_VALUETYPE => Type::Ref(TypeTag::ValueType, TypeDefOrRef::decode(uncompress_unsigned(cur)?, db)?.expect("Null type in ValueType Type"), None),
             bits::ELEMENT_TYPE_VAR => Type::GenericVar(GenericVarScope::Type, uncompress_unsigned(cur)?),
-            b => return Err(format!("Unexpected element type for Type: {}", b).into())
+            _ => return Err("Unexpected element type for Type".into())
         })
     }
 }
@@ -542,7 +542,7 @@ impl<'db> TypeSpecSig<'db> {
                 let (typetag, typ, args) = parse_generic_inst(cur, db)?;
                 Ok(TypeSpecSig::GenericInst(typetag, typ, args))
             },
-            b => return Err(format!("Unexpected element type for TypeSpec: {}", b).into())
+            _ => return Err("Unexpected element type for TypeSpec".into())
         }
     }
 }
@@ -586,6 +586,7 @@ mod tests {
         assert_eq!(uncompress_unsigned(&[0xBF, 0xFF]).unwrap(), 0x3FFF);
         assert_eq!(uncompress_unsigned(&[0xC0, 0x00, 0x40, 0x00]).unwrap(), 0x4000);
         assert_eq!(uncompress_unsigned(&[0xDF, 0xFF, 0xFF, 0xFF]).unwrap(), 0x1FFFFFFF);
+        assert!(uncompress_unsigned(&[]).is_err());
     }
 
     // fn uncompress_signed(data: &[u8]) -> crate::Result<u32> {

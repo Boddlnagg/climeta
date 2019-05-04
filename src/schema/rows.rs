@@ -112,7 +112,7 @@ impl<'db> Constant<'db> {
             ConstantType::String => {
                 let string = match bytes.as_string(0) {
                     None => None,
-                    Some(s) => Some(std::str::from_utf8(s)?)
+                    Some(s) => Some(std::str::from_utf8(s).map_err(|_| crate::DecodeError("Invalid UTF8 in constant value"))?)
                 };
                 String(string)
             },

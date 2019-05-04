@@ -492,7 +492,7 @@ impl<'db> Database<'db> {
             None => return Err("Missing string terminator".into())
         };
 
-        Ok(std::str::from_utf8(&view[..len])?)
+        std::str::from_utf8(&view[..len]).map_err(|_| "Invalid UTF8 in string heap".into())
     }
 
     pub(crate) fn get_blob(&self, index: u32) -> Result<&[u8]> {
