@@ -24,7 +24,7 @@ pub(super) mod bits {
 
 #[repr(u16)]
 #[derive(FromPrimitive, ToPrimitive)]
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum VtableLayout {
     ReuseSlot = 0x0000, // Method reuses existing slot in a vtable
     NewSlot = 0x0100,   // Method always gets a new slot in the vtable

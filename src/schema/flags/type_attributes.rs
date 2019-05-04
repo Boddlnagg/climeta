@@ -22,7 +22,7 @@ pub(super) mod bits {
 
 #[repr(u32)]
 #[derive(FromPrimitive, ToPrimitive)]
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum TypeVisibility {
     NotPublic = 0x00000000,
     Public = 0x00000001,
@@ -36,7 +36,7 @@ pub enum TypeVisibility {
 
 #[repr(u32)]
 #[derive(FromPrimitive, ToPrimitive)]
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum TypeLayout {
     AutoLayout = 0x00000000,
     SequentialLayout = 0x00000008,
@@ -45,7 +45,7 @@ pub enum TypeLayout {
 
 #[repr(u32)]
 #[derive(FromPrimitive, ToPrimitive)]
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum TypeSemantics {
     Class = 0x00000000,
     Interface = 0x00000020,
@@ -53,7 +53,7 @@ pub enum TypeSemantics {
 
 #[repr(u32)]
 #[derive(FromPrimitive, ToPrimitive)]
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum StringFormat {
     AnsiClass = 0x00000000,
     UnicodeClass = 0x00010000,

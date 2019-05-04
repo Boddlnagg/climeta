@@ -10,7 +10,7 @@ pub(super) mod bits {
 
 #[repr(u16)]
 #[derive(FromPrimitive, ToPrimitive)]
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum GenericParamVariance {
     None = 0x0000,
     Covariant = 0x0001,
@@ -19,7 +19,7 @@ pub enum GenericParamVariance {
 
 #[repr(u16)]
 #[derive(FromPrimitive, ToPrimitive)]
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum GenericParamSpecialConstraint {
     ReferenceTypeConstraint = 0x0004,
     NotNullableValueTypeConstraint = 0x0008,

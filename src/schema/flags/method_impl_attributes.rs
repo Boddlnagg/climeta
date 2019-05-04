@@ -16,7 +16,7 @@ pub(super) mod bits {
 
 #[repr(u16)]
 #[derive(FromPrimitive, ToPrimitive)]
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum CodeType {
     IL = 0x0000,      // Method impl is CIL
     Native = 0x0001,  // Method impl is native
@@ -26,7 +26,7 @@ pub enum CodeType {
 
 #[repr(u16)]
 #[derive(FromPrimitive, ToPrimitive)]
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum Managed {
     Unmanaged = 0x0004,
     Managed = 0x0000,

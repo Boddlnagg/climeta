@@ -255,6 +255,13 @@ impl<'db> TypeDef<'db> {
             Ok(Some(t)) => t.namespace_name_pair() == ("System", "Enum")
         }
     }
+
+    pub fn is_interface(&self) -> bool {
+        match self.flags() {
+            Err(_) => false,
+            Ok(f) => f.semantics() == TypeSemantics::Interface
+        }
+    }
 }
 
 impl<'db> ResolveToTypeDef<'db> for TypeDef<'db> {

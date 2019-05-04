@@ -17,6 +17,7 @@ fn main() -> Result<(), Box<std::error::Error>> {
     let mut db_count = 0;
     let mut typedef_count = 0;
     let mut enum_count = 0;
+    let mut interface_count = 0;
     let mut method_count = 0;
 
     for db in &cache {
@@ -25,6 +26,8 @@ fn main() -> Result<(), Box<std::error::Error>> {
             typedef_count += 1;
             if typedef.is_enum() {
                 enum_count += 1;
+            } else if typedef.is_interface() {
+                interface_count += 1;
             }
             for method in typedef.method_list()? {
                 method_count += 1;
@@ -33,7 +36,8 @@ fn main() -> Result<(), Box<std::error::Error>> {
         }
     }
 
-    println!("Databases: {}, TypeDefs: {} ({} enums), Methods: {}", db_count, typedef_count, enum_count, method_count);
+    println!("Databases: {}, TypeDefs: {} ({} enums, {} interfaces), Methods: {}",
+             db_count, typedef_count, enum_count, interface_count, method_count);
 
     Ok(())
 }
