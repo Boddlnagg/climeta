@@ -17,19 +17,19 @@ pub(crate) trait TableDesc: TableKind {
     type Columns;
 }
 
-pub(crate) trait TableAccess<'db, T> {
+pub(crate) trait TableInfoAccess<'db, T> {
     fn get_table_info(&self) -> &TableInfo<'db, T>;
 }
 
-macro_rules! impl_table_access {
+macro_rules! impl_tableinfo_access {
     ( $tab:ident ) => {
-        impl<'db> TableAccess<'db, schema::marker::$tab> for Tables<'db> {
+        impl<'db> TableInfoAccess<'db, schema::marker::$tab> for Tables<'db> {
             fn get_table_info(&self) -> &TableInfo<'db, schema::marker::$tab> {
                 &self.$tab
             }
         }
 
-        impl<'db> TableAccess<'db, schema::marker::$tab> for Database<'db> {
+        impl<'db> TableInfoAccess<'db, schema::marker::$tab> for Database<'db> {
             fn get_table_info(&self) -> &TableInfo<'db, schema::marker::$tab> {
                 &self.m_tables.$tab
             }
@@ -37,44 +37,44 @@ macro_rules! impl_table_access {
     }
 }
 
-impl_table_access!(TypeRef);
-impl_table_access!(GenericParamConstraint);
-impl_table_access!(TypeSpec);
-impl_table_access!(TypeDef);
-impl_table_access!(CustomAttribute);
-impl_table_access!(MethodDef);
-impl_table_access!(MemberRef);
-impl_table_access!(Module);
-impl_table_access!(Param);
-impl_table_access!(InterfaceImpl);
-impl_table_access!(Constant);
-impl_table_access!(Field);
-impl_table_access!(FieldMarshal);
-impl_table_access!(DeclSecurity);
-impl_table_access!(ClassLayout);
-impl_table_access!(FieldLayout);
-impl_table_access!(StandAloneSig);
-impl_table_access!(EventMap);
-impl_table_access!(Event);
-impl_table_access!(PropertyMap);
-impl_table_access!(Property);
-impl_table_access!(MethodSemantics);
-impl_table_access!(MethodImpl);
-impl_table_access!(ModuleRef);
-impl_table_access!(ImplMap);
-impl_table_access!(FieldRVA);
-impl_table_access!(Assembly);
-impl_table_access!(AssemblyProcessor);
-impl_table_access!(AssemblyOS);
-impl_table_access!(AssemblyRef);
-impl_table_access!(AssemblyRefProcessor);
-impl_table_access!(AssemblyRefOS);
-impl_table_access!(File);
-impl_table_access!(ExportedType);
-impl_table_access!(ManifestResource);
-impl_table_access!(NestedClass);
-impl_table_access!(GenericParam);
-impl_table_access!(MethodSpec);
+impl_tableinfo_access!(TypeRef);
+impl_tableinfo_access!(GenericParamConstraint);
+impl_tableinfo_access!(TypeSpec);
+impl_tableinfo_access!(TypeDef);
+impl_tableinfo_access!(CustomAttribute);
+impl_tableinfo_access!(MethodDef);
+impl_tableinfo_access!(MemberRef);
+impl_tableinfo_access!(Module);
+impl_tableinfo_access!(Param);
+impl_tableinfo_access!(InterfaceImpl);
+impl_tableinfo_access!(Constant);
+impl_tableinfo_access!(Field);
+impl_tableinfo_access!(FieldMarshal);
+impl_tableinfo_access!(DeclSecurity);
+impl_tableinfo_access!(ClassLayout);
+impl_tableinfo_access!(FieldLayout);
+impl_tableinfo_access!(StandAloneSig);
+impl_tableinfo_access!(EventMap);
+impl_tableinfo_access!(Event);
+impl_tableinfo_access!(PropertyMap);
+impl_tableinfo_access!(Property);
+impl_tableinfo_access!(MethodSemantics);
+impl_tableinfo_access!(MethodImpl);
+impl_tableinfo_access!(ModuleRef);
+impl_tableinfo_access!(ImplMap);
+impl_tableinfo_access!(FieldRVA);
+impl_tableinfo_access!(Assembly);
+impl_tableinfo_access!(AssemblyProcessor);
+impl_tableinfo_access!(AssemblyOS);
+impl_tableinfo_access!(AssemblyRef);
+impl_tableinfo_access!(AssemblyRefProcessor);
+impl_tableinfo_access!(AssemblyRefOS);
+impl_tableinfo_access!(File);
+impl_tableinfo_access!(ExportedType);
+impl_tableinfo_access!(ManifestResource);
+impl_tableinfo_access!(NestedClass);
+impl_tableinfo_access!(GenericParam);
+impl_tableinfo_access!(MethodSpec);
 
 
 #[allow(non_snake_case)]
@@ -121,8 +121,8 @@ pub(crate) struct Tables<'db> {
 }
 
 impl<'db> Tables<'db> {
-    pub fn get_table_info<T: TableDesc>(&self) -> &TableInfo<'db, T> where Self: TableAccess<'db, T> {
-        <Self as TableAccess<'db, T>>::get_table_info(self)
+    pub fn get_table_info<T: TableDesc>(&self) -> &TableInfo<'db, T> where Self: TableInfoAccess<'db, T> {
+        <Self as TableInfoAccess<'db, T>>::get_table_info(self)
     }
 }
 
@@ -472,12 +472,12 @@ impl<'db> Database<'db> {
         })
     }
 
-    pub(crate) fn get_table_info<T: TableKind>(&self) -> &TableInfo<'db, T> where Self: TableAccess<'db, T> {
-        <Self as TableAccess<'db, T>>::get_table_info(self)
+    pub(crate) fn get_table_info<T: TableKind>(&self) -> &TableInfo<'db, T> where Self: TableInfoAccess<'db, T> {
+        <Self as TableInfoAccess<'db, T>>::get_table_info(self)
     }
 
     pub fn get_table<T: crate::TableRow>(&'db self) -> Table<'db, T::Kind>
-        where Self: TableAccess<'db, T::Kind>
+        where Self: TableInfoAccess<'db, T::Kind>
     {
         Table {
             db: self,

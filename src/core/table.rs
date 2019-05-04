@@ -202,7 +202,7 @@ impl<'db, T: TableKind> Row<'db, T> where &'db T: TableRowAccess<Table=Table<'db
     }
 
     pub(crate) fn get_list<Col: ColumnIndex, Target: TableKind>(&self) -> Result<TableRowIterator<'db, Target>>
-        where db::Database<'db>: db::TableAccess<'db, Target>,
+        where db::Database<'db>: db::TableInfoAccess<'db, Target>,
               T: ColumnAccess<Col>, u32: ReadValue<T::ColumnSize>,
               &'db Target: TableRowAccess<Table=Table<'db, Target>>,
               <&'db Target as TableRowAccess>::Out: TableRow<Kind=Target>,
@@ -229,7 +229,7 @@ impl<'db, T: TableKind> Row<'db, T> where &'db T: TableRowAccess<Table=Table<'db
     }
 
     pub(crate) fn get_target_row<Col: ColumnIndex, Target: TableKind>(&self)  -> Result<<&'db Target as TableRowAccess>::Out>
-        where db::Database<'db>: db::TableAccess<'db, Target>,
+        where db::Database<'db>: db::TableInfoAccess<'db, Target>,
               T: ColumnAccess<Col>, u32: ReadValue<T::ColumnSize>,
               &'db Target: TableRowAccess<Table=Table<'db, Target>>,
               <&'db Target as TableRowAccess>::Out: TableRow<Kind=Target>
