@@ -248,6 +248,23 @@ impl<'db> TypeDef<'db> {
         self.0.get_list::<Col5, marker::MethodDef>()
     }
 
+    pub fn type_category(&self) -> Result<super::TypeCategory> {
+        use super::TypeCategory::*;
+        let result = if self.flags()?.semantics() == TypeSemantics::Interface {
+            Interface
+        } else if let Some(t) = self.extends()? {
+            match t.namespace_name_pair() {
+                ("System", "Enum") => Enum,
+                ("System", "ValueType") => Struct,
+                ("System", "MulticastDelegate") => Delegate,
+                _ => Class
+            }
+        } else {
+            Class
+        };
+        Ok(result)
+    }
+
     pub fn is_enum(&self) -> bool {
         match self.extends() {
             Err(_) => false,

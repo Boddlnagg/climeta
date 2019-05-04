@@ -265,7 +265,7 @@ impl<'db> ResolveToTypeDef<'db> for TypeDefOrRef<'db> {
 
 #[repr(u16)]
 #[derive(FromPrimitive, ToPrimitive)]
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum ConstantType {
     Boolean = 0x02,
     Char = 0x03,
@@ -322,4 +322,13 @@ impl<'db> fmt::Debug for FieldInit<'db> {
             NullRef | String(None) => write!(f, "nullref"),
         }
     }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum TypeCategory {
+    Interface,
+    Class,
+    Enum,
+    Struct,
+    Delegate
 }
