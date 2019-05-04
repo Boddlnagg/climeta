@@ -6,11 +6,9 @@ use std::io;
 use crate::Result;
 use crate::schema;
 use crate::core::pe;
-use crate::core::table::TableInfo;
+use crate::core::table::{TableInfo, Table};
 use crate::core::ByteView;
 use crate::core::columns::{FixedSize2, FixedSize4, FixedSize8, DynamicSize};
-
-pub use crate::core::table::{Table, TableRowIterator}; // FIXME: no pub use from core (except in root)
 
 
 pub trait TableKind: Copy {}

@@ -4,8 +4,7 @@ use crate::Result;
 
 use crate::core::columns::{Column, ColumnIndex, ColumnTuple, ColumnAccess, ReadValue, DynamicSize};
 
-// TODO: not pub?
-pub struct TableInfo<'db, T> {
+pub(crate) struct TableInfo<'db, T> {
     p: std::marker::PhantomData<T>,
     pub(crate) m_row_count: u32,
     pub(crate) m_row_size: u8,
