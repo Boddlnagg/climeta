@@ -19,7 +19,6 @@ pub mod schema;
 type Result<T> = ::std::result::Result<T, Box<std::error::Error>>; // TODO: better error type
 
 pub use crate::core::table::Table;
-pub use db::is_database;
 
 struct StableMmap(Mmap);
 
@@ -133,6 +132,10 @@ impl<'db> Database<'db> {
         where Self: TableAccess<'db, T>
     {
         self.get_table()
+    }
+
+    pub fn is_database<P: AsRef<Path>>(path: P) -> std::io::Result<bool> {
+        db::is_database(path)
     }
 }
 
