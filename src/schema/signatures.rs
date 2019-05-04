@@ -1,4 +1,3 @@
-use std::io::Cursor;
 use std::fmt;
 use std::mem;
 use byteorder::ReadBytesExt;
@@ -6,19 +5,7 @@ use crate::Result;
 use crate::core::db::{Database, CodedIndex};
 use super::TypeDefOrRef;
 
-trait ByteCursorExt {
-    type Out;
-    fn bytes_left(&self) -> Self::Out;
-}
-
-impl<'a> ByteCursorExt for Cursor<&'a [u8]> {
-    type Out = &'a [u8];
-    fn bytes_left(&self) -> Self::Out {
-        &self.get_ref()[self.position() as usize ..]
-    }
-}
-
-fn uncompress_unsigned(cursor: &mut Cursor<&[u8]>) -> Result<u32> {
+fn uncompress_unsigned(cursor: &mut &[u8]) -> Result<u32> {
     let first = cursor.read_u8()?;
     if (first & 0x80) == 0x00 {
         Ok(first as u32)
@@ -38,7 +25,7 @@ fn uncompress_unsigned(cursor: &mut Cursor<&[u8]>) -> Result<u32> {
 }
 
 #[allow(dead_code, unused_variables)]
-fn uncompress_signed(cursor: &mut Cursor<&[u8]>) -> Result<i32> {
+fn uncompress_signed(cursor: &mut &[u8]) -> Result<i32> {
     unimplemented!()
 }
 
@@ -106,7 +93,7 @@ pub struct MethodDefSig<'db> {
 }
 
 impl<'db> MethodDefSig<'db> {
-    pub(crate) fn parse(cur: &mut Cursor<&'db [u8]>, db: &'db Database) -> Result<MethodDefSig<'db>> {
+    pub(crate) fn parse(cur: &mut &'db [u8], db: &'db Database) -> Result<MethodDefSig<'db>> {
         let initial_byte = cur.read_u8()?;
         let generic_param_count = if initial_byte & bits::GENERIC != 0 {
             uncompress_unsigned(cur)?
@@ -172,7 +159,7 @@ pub struct Array<'db> {
 }
 
 impl<'db> Array<'db> {
-    fn parse_szarray(cur: &mut Cursor<&'db [u8]>, db: &'db Database) -> Result<Array<'db>> {
+    fn parse_szarray(cur: &mut &'db [u8], db: &'db Database) -> Result<Array<'db>> {
         // ELEMENT_TYPE_SZARRAY already consumed
         let cmod = CustomMod::parse(cur, db)?;
         Ok(Array {
@@ -274,7 +261,7 @@ pub enum Type<'db> {
 }
 
 impl<'db> Type<'db> {
-    fn parse(cur: &mut Cursor<&'db [u8]>, db: &'db Database) -> Result<Type<'db>> {
+    fn parse(cur: &mut &'db [u8], db: &'db Database) -> Result<Type<'db>> {
         let element_type = uncompress_unsigned(cur)?;
         Ok(match element_type as u8 {
             bits::ELEMENT_TYPE_BOOLEAN => Type::Primitive(PrimitiveType::Boolean),
@@ -310,7 +297,7 @@ impl<'db> Type<'db> {
     }
 }
 
-fn parse_generic_inst<'db>(cur: &mut Cursor<&'db [u8]>, db: &'db Database) -> Result<(TypeTag, TypeDefOrRef<'db>, Box<[Type<'db>]>)> {
+fn parse_generic_inst<'db>(cur: &mut &'db [u8], db: &'db Database) -> Result<(TypeTag, TypeDefOrRef<'db>, Box<[Type<'db>]>)> {
     let typetag = match uncompress_unsigned(cur)? as u8 {
         bits::ELEMENT_TYPE_CLASS => TypeTag::Class,
         bits::ELEMENT_TYPE_VALUETYPE => TypeTag::ValueType,
@@ -395,7 +382,7 @@ pub struct RetType<'db> {
 }
 
 impl<'db> RetType<'db> {
-    fn parse(cur: &mut Cursor<&'db [u8]>, db: &'db Database) -> Result<RetType<'db>> {
+    fn parse(cur: &mut &'db [u8], db: &'db Database) -> Result<RetType<'db>> {
         let cmod = CustomMod::parse(cur, db)?;
 
         let mut cur_clone = cur.clone(); // maybe we need to rewind
@@ -451,7 +438,7 @@ pub struct ParamSig<'db> {
 }
 
 impl<'db> ParamSig<'db> {
-    fn parse(cur: &mut Cursor<&'db [u8]>, db: &'db Database) -> Result<ParamSig<'db>> {
+    fn parse(cur: &mut &'db [u8], db: &'db Database) -> Result<ParamSig<'db>> {
         let cmod = CustomMod::parse(cur, db)?;
 
         let mut cur_clone = cur.clone(); // maybe we need to rewind
@@ -493,7 +480,7 @@ pub struct CustomMod<'db> {
 }
 
 impl<'db> CustomMod<'db> {
-    fn parse(cur: &mut Cursor<&'db [u8]>, db: &'db Database) -> Result<Vec<CustomMod<'db>>> {
+    fn parse(cur: &mut &'db [u8], db: &'db Database) -> Result<Vec<CustomMod<'db>>> {
         let mut result = Vec::new();
 
         loop {
@@ -531,7 +518,7 @@ pub enum TypeSpecSig<'db> {
 }
 
 impl<'db> TypeSpecSig<'db> {
-    pub(crate) fn parse(cur: &mut Cursor<&'db [u8]>, db: &'db Database) -> Result<TypeSpecSig<'db>> {
+    pub(crate) fn parse(cur: &mut &'db [u8], db: &'db Database) -> Result<TypeSpecSig<'db>> {
         let element_type = uncompress_unsigned(cur)?;
         match element_type as u8 {
             bits::ELEMENT_TYPE_PTR | 
@@ -570,11 +557,8 @@ impl<'db> fmt::Debug for TypeSpecSig<'db> {
 
 #[cfg(test)]
 mod tests {
-    use std::io::Cursor;
-
-    fn uncompress_unsigned(data: &[u8]) -> crate::Result<u32> {
-        let mut cur = Cursor::new(data);
-        super::uncompress_unsigned(&mut cur)
+    fn uncompress_unsigned(mut data: &[u8]) -> crate::Result<u32> {
+        super::uncompress_unsigned(&mut data)
     }
 
     #[test]
@@ -589,9 +573,8 @@ mod tests {
         assert!(uncompress_unsigned(&[]).is_err());
     }
 
-    // fn uncompress_signed(data: &[u8]) -> crate::Result<u32> {
-    //     let mut cur = Cursor::new(data);
-    //     super::uncompress_signed(&mut cur)
+    // fn uncompress_signed(mut data: &[u8]) -> crate::Result<u32> {
+    //     super::uncompress_signed(&mut data)
     // }
 
     // #[test]
