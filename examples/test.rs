@@ -57,7 +57,7 @@ fn main() -> Result<(), Box<std::error::Error>> {
     for row in typedefs {
         print_typedef(&row)?;
     }
-    println!("TOTAL: {} == {}", typedefs.size(), typedefs.iter().count());
+    println!("TOTAL: {} == {}", typedefs.len(), typedefs.iter().count());
     println!("Looking for Windows.Foundation.Point ...");
     print_typedef(&cache.find("Windows.Foundation", "Point").unwrap())?;
 
@@ -114,8 +114,8 @@ fn main() -> Result<(), Box<std::error::Error>> {
     //     }
     // }
 
-    println!("TOTAL: {}", typedefs.size());
-    println!("TOTAL (Foundation): {}", db.table::<TypeDef>().size());
+    println!("TOTAL: {}", typedefs.len());
+    println!("TOTAL (Foundation): {}", db.table::<TypeDef>().len());
 
     Ok(())
 }

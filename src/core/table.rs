@@ -64,7 +64,7 @@ pub struct Table<'db, T: TableKind> {
 }
 
 impl<'db, T: TableKind> Table<'db, T> where &'db T: TableRowAccess<Table=Self> {
-    pub fn size(&self) -> u32 {
+    pub fn len(&self) -> u32 {
         self.table.m_row_count
     }
 
@@ -77,7 +77,7 @@ impl<'db, T: TableKind> Table<'db, T> where &'db T: TableRowAccess<Table=Self> {
     {
         let data_size = self.table.m_columns[Col::idx()].size;
 
-        if row > self.size() {
+        if row > self.len() {
             return Err("Invalid row index".into());
         }
         let input = &self.table.m_data.unwrap()[row as usize * self.table.m_row_size as usize +
@@ -86,7 +86,7 @@ impl<'db, T: TableKind> Table<'db, T> where &'db T: TableRowAccess<Table=Self> {
     }
 
     pub fn get_row(&self, row: u32) -> Result<<&'db T as TableRowAccess>::Out> {
-        if row > self.size() {
+        if row > self.len() {
             return Err("Invalid row index".into());
         }
         
@@ -104,7 +104,7 @@ impl<'db, T: TableKind> IntoIterator for Table<'db, T>
         TableRowIterator {
             m_table: self,
             m_row: 0,
-            m_end: self.size()
+            m_end: self.len()
         }
     }
 }
@@ -212,13 +212,13 @@ impl<'db, T: TableKind> Row<'db, T> where &'db T: TableRowAccess<Table=Table<'db
         assert!(first != 0);
         let first = first - 1;
 
-        let last = if self.m_row + 1 < self.m_table.size() {
+        let last = if self.m_row + 1 < self.m_table.len() {
             // this is not the last row
             let tmp = self.m_table.get_value::<Col, u32>(self.m_row + 1)?;
             assert!(tmp != 0);
             tmp - 1
         } else {
-            target_table.size()
+            target_table.len()
         };
         
         Ok(TableRowIterator {
