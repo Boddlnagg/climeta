@@ -1,6 +1,7 @@
 #[macro_use] extern crate num_derive;
 use memmap::Mmap;
 use stable_deref_trait::StableDeref;
+use owning_ref::OwningHandle;
 use elsa::FrozenVec;
 
 use std::fs::File;
@@ -20,54 +21,6 @@ type Result<T> = ::std::result::Result<T, Box<std::error::Error>>; // TODO: bett
 pub use crate::core::table::Table;
 pub use db::is_database;
 
-
-// our own little copy of owning_ref::OwningHandle where the H: Deref bound is dropped
-// (see also https://github.com/Kimundi/owning-ref-rs/issues/18 and )
-mod owning_ref {
-    use std::ops::Deref;
-    use stable_deref_trait::StableDeref as StableAddress;
-
-    pub struct OwningHandle<O, H>
-        where O: StableAddress,
-    {
-        handle: H,
-        _owner: O,
-    }
-
-    impl<O, H> Deref for OwningHandle<O, H>
-        where O: StableAddress,
-    {
-        type Target = H;
-        fn deref(&self) -> &H {
-            &self.handle
-        }
-    }
-
-    impl<O, H> OwningHandle<O, H>
-        where O: StableAddress,
-    {
-        /// Create a new OwningHandle. The provided callback will be invoked with
-        /// a pointer to the object owned by `o`, and the returned value is stored
-        /// as the object to which this `OwningHandle` will forward `Deref` and
-        /// `DerefMut`.
-        pub fn try_new<F, E>(o: O, f: F) -> Result<Self, E>
-            where F: FnOnce(*const O::Target) -> Result<H, E>
-        {
-            let h: H;
-            {
-                h = f(o.deref() as *const O::Target)?;
-            }
-
-            Ok(OwningHandle {
-            handle: h,
-            _owner: o,
-            })
-        }
-    }
-}
-
-use self::owning_ref::OwningHandle;
-
 struct StableMmap(Mmap);
 
 impl Deref for StableMmap {
@@ -79,9 +32,17 @@ impl Deref for StableMmap {
 // Mmap object, but solely on the mapped memory, so this is safe
 unsafe impl StableDeref for StableMmap {}
 
+// OwningHandle requires the Handle to implement Deref (see also https://github.com/Kimundi/owning-ref-rs/issues/18)
+struct DerefDatabase<'db>(db::Database<'db>);
+
+impl<'db> Deref for DerefDatabase<'db> {
+    type Target = db::Database<'db>;
+    fn deref(&self) -> &Self::Target { &self.0 }
+}
+
 // Separate type because enum variants are always public
 enum DatabaseInner<'db> {
-    Owned(OwningHandle<StableMmap, db::Database<'db>>),
+    Owned(OwningHandle<StableMmap, DerefDatabase<'db>>),
     Borrowed(db::Database<'db>)
 }
 
@@ -160,7 +121,7 @@ impl<'db> Database<'db> {
         let file = File::open(path.as_ref())?;
         let mmap = StableMmap(unsafe { Mmap::map(&file)? });
         Ok(Database(DatabaseInner::Owned(
-            OwningHandle::try_new(mmap, |ptr: *const [u8]| unsafe { db::Database::load(&(*ptr)[..]) })?
+            OwningHandle::try_new(mmap, |ptr: *const [u8]| db::Database::load(unsafe { &(*ptr)[..] }).map(|db| DerefDatabase(db)))?
         )))
     }
 
