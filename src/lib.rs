@@ -281,15 +281,18 @@ struct MemberCache<'db> {
 
 
 pub trait ResolveToTypeDef<'db> {
-    fn resolve(&self, cache: &'db Cache<'db>) -> Option<schema::TypeDef<'db>>;
+    fn namespace_name_pair(&self) -> (&'db str, &'db str);
+    fn resolve(&self, cache: &'db Cache<'db>) -> Option<schema::TypeDef<'db>> {
+        let (namespace, name) = self.namespace_name_pair();
+        cache.find(namespace, name)
+    }
 }
 
-impl<'db> ResolveToTypeDef<'db> for &str {
-    fn resolve(&self, cache: &'db Cache<'db>) -> Option<schema::TypeDef<'db>> {
-        let (namespace, name) = match self.rfind('.') {
-            None => return None,
+impl<'db> ResolveToTypeDef<'db> for &'db str {
+    fn namespace_name_pair(&self) -> (&'db str, &'db str) {
+        match self.rfind('.') {
+            None => return ("", &self[..]),
             Some(dot) => (&self[..dot], &self[dot+1 ..])
-        };
-        cache.find(namespace, name)
+        }
     }
 }

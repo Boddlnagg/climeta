@@ -247,6 +247,26 @@ impl<'db> TypeDef<'db> {
     pub fn method_list(&self) -> Result<TableRowIterator<'db, marker::MethodDef>> {
         self.0.get_list::<Col5, marker::MethodDef>()
     }
+
+    pub fn is_enum(&self) -> bool {
+        match self.extends() {
+            Err(_) => false,
+            Ok(None) => false,
+            Ok(Some(t)) => t.namespace_name_pair() == ("System", "Enum")
+        }
+    }
+}
+
+impl<'db> ResolveToTypeDef<'db> for TypeDef<'db> {
+    fn namespace_name_pair(&self) -> (&'db str, &'db str) {
+        let namespace = self.type_namespace().unwrap_or("");
+        let name = self.type_name().expect("TypeDef without type name");
+        (namespace, name)
+    }
+
+    fn resolve(&self, _cache: &'db Cache<'db>) -> Option<TypeDef<'db>> {
+        Some(self.clone())
+    }
 }
 
 // ECMA-335, II.22.38
@@ -265,11 +285,10 @@ impl<'db> TypeRef<'db> {
 }
 
 impl<'db> ResolveToTypeDef<'db> for TypeRef<'db> {
-    fn resolve(&self, cache: &'db Cache<'db>) -> Option<schema::TypeDef<'db>> {
-        // TODO: load external database on demand? (we can modify the cache!)
-        let namespace = self.type_name().ok()?;
-        let name = self.type_name().ok()?;
-        cache.find(namespace, name)
+    fn namespace_name_pair(&self) -> (&'db str, &'db str) {
+        let namespace = self.type_namespace().unwrap_or("");
+        let name = self.type_name().expect("TypeRef without type name");
+        (namespace, name)
     }
 }
 

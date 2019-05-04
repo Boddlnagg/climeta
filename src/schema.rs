@@ -246,6 +246,14 @@ coded_index! {
 }
 
 impl<'db> ResolveToTypeDef<'db> for TypeDefOrRef<'db> {
+    fn namespace_name_pair(&self) -> (&'db str, &'db str) {
+        match self {
+            TypeDefOrRef::TypeDef(d) => d.namespace_name_pair(),
+            TypeDefOrRef::TypeRef(r) => r.namespace_name_pair(),
+            TypeDefOrRef::TypeSpec(_s) => panic!("TypeSpec has no namespace/name pair"),
+        }
+    }
+
     fn resolve(&self, cache: &'db Cache<'db>) -> Option<TypeDef<'db>> {
         match self {
             TypeDefOrRef::TypeDef(d) => Some(d.clone()),

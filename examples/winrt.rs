@@ -16,12 +16,16 @@ fn main() -> Result<(), Box<std::error::Error>> {
 
     let mut db_count = 0;
     let mut typedef_count = 0;
+    let mut enum_count = 0;
     let mut method_count = 0;
 
     for db in &cache {
         db_count += 1;
         for typedef in db.table::<TypeDef>() {
             typedef_count += 1;
+            if typedef.is_enum() {
+                enum_count += 1;
+            }
             for method in typedef.method_list()? {
                 method_count += 1;
                 let _sig = method.signature()?;
@@ -29,7 +33,7 @@ fn main() -> Result<(), Box<std::error::Error>> {
         }
     }
 
-    println!("Databases: {}, TypeDefs: {}, Methods: {}", db_count, typedef_count, method_count);
+    println!("Databases: {}, TypeDefs: {} ({} enums), Methods: {}", db_count, typedef_count, enum_count, method_count);
 
     Ok(())
 }
