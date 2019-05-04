@@ -192,3 +192,18 @@ impl<'db> Cache<'db> {
 struct MemberCache<'db> {
     types: HashMap<&'db str, schema::TypeDef<'db>>,
 }
+
+
+pub trait ResolveToTypeDef<'db> {
+    fn resolve(&self, cache: &'db Cache<'db>) -> Option<schema::TypeDef<'db>>;
+}
+
+impl<'db> ResolveToTypeDef<'db> for &str {
+    fn resolve(&self, cache: &'db Cache<'db>) -> Option<schema::TypeDef<'db>> {
+        let (namespace, name) = match self.rfind('.') {
+            None => return None,
+            Some(dot) => (&self[..dot], &self[dot+1 ..])
+        };
+        cache.find(namespace, name)
+    }
+}

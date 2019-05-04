@@ -3,10 +3,10 @@ use std::io::Cursor;
 use num_traits::FromPrimitive;
 use byteorder::{ByteOrder, LittleEndian};
 
+use crate::{Result, Cache, ResolveToTypeDef};
 use crate::core::columns::{Col0, Col1, Col2, Col3, Col4, Col5};
 use crate::core::table::{Row, TableRowIterator};
 use crate::core::ByteView;
-use crate::Result;
 use crate::schema;
 use crate::schema::marker;
 use crate::schema::signatures::*;
@@ -264,6 +264,15 @@ impl<'db> TypeRef<'db> {
 
     pub fn type_namespace(&self) -> Result<&'db str> {
         self.0.get_string::<Col2>()
+    }
+}
+
+impl<'db> ResolveToTypeDef<'db> for TypeRef<'db> {
+    fn resolve(&self, cache: &'db Cache<'db>) -> Option<schema::TypeDef<'db>> {
+        // TODO: load external database on demand? (we can modify the cache!)
+        let namespace = self.type_name().ok()?;
+        let name = self.type_name().ok()?;
+        cache.find(namespace, name)
     }
 }
 

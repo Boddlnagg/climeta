@@ -1,4 +1,4 @@
-use climeta::{Database, Cache};
+use climeta::{Database, Cache, ResolveToTypeDef};
 use climeta::schema::{RetTypeKind, Type, TypeDef, TypeDefOrRef};
 
 pub fn mmap_file<P: AsRef<std::path::Path>>(path: P) -> std::io::Result<memmap::Mmap> {
@@ -60,6 +60,7 @@ fn main() -> Result<(), Box<std::error::Error>> {
     println!("TOTAL: {} == {}", typedefs.len(), typedefs.iter().count());
     println!("Looking for Windows.Foundation.Point ...");
     print_typedef(&cache.find("Windows.Foundation", "Point").unwrap())?;
+    print_typedef(&"Windows.Foundation.Point".resolve(&cache).unwrap())?;
 
 
     // println!("Typespecs:");

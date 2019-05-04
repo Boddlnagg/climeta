@@ -1,6 +1,6 @@
-use crate::core::db::{Database, Tables, CodedIndex};
-use crate::Result;
+use crate::{Result, Cache, ResolveToTypeDef};
 
+use crate::core::db::{Database, Tables, CodedIndex};
 use crate::core::columns::DynamicSize;
 
 pub mod flags;
@@ -240,6 +240,16 @@ coded_index! {
     TypeOrMethodDef[1] {
         0 => TypeDef,
         1 => MethodDef
+    }
+}
+
+impl<'db> ResolveToTypeDef<'db> for TypeDefOrRef<'db> {
+    fn resolve(&self, cache: &'db Cache<'db>) -> Option<TypeDef<'db>> {
+        match self {
+            TypeDefOrRef::TypeDef(d) => Some(d.clone()),
+            TypeDefOrRef::TypeRef(r) => r.resolve(cache),
+            TypeDefOrRef::TypeSpec(_s) => panic!("TypeSpec cannot be resolved to TypeDef"),
+        }
     }
 }
 
