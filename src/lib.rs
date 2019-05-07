@@ -260,17 +260,30 @@ impl<'db> Cache<'db> {
         map.get(type_namespace).and_then(|ns| ns.types.get(type_name).map(|t| t.clone()))
     }
 
-    pub fn iter(&'db self) -> elsa::vec::Iter<'db, Box<Database<'db>>> {
+    pub fn iter(&'db self) -> impl Iterator<Item = &'db Database<'db>> {
         self.into_iter()
     }
 }
 
 impl<'db> IntoIterator for &'db Cache<'db> {
     type Item = &'db Database<'db>;
-    type IntoIter = elsa::vec::Iter<'db, Box<Database<'db>>>;
+    type IntoIter = iter::DatabaseIter<'db>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.databases.into_iter()
+        iter::DatabaseIter(self.databases.into_iter())
+    }
+}
+
+// hide DatabaseIter in a private submodule, it's not part of the public API
+mod iter {
+    use super::Database;
+    pub struct DatabaseIter<'db>(pub(crate) elsa::vec::Iter<'db, Box<Database<'db>>>);
+
+    impl<'db> Iterator for DatabaseIter<'db> {
+        type Item = &'db Database<'db>;
+        fn next(&mut self) -> Option<Self::Item> {
+            self.0.next()
+        }
     }
 }
 
