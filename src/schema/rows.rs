@@ -83,7 +83,7 @@ impl<'db> AssemblyProcessor<'db> {
 
 // ECMA-335, II.22.5
 impl<'db> AssemblyRef<'db> {
-    pub fn public_key_or_token(&self) -> Result<&'db [u8]> {
+    pub fn public_key_or_token(&self) -> Result<Option<&'db [u8]>> {
         self.0.get_blob::<Col2>()
     }
 
@@ -132,7 +132,7 @@ impl<'db> Constant<'db> {
     pub fn value(&self) -> Result<super::FieldInit> {
         use super::ConstantType;
         use super::FieldInit::*;
-        let bytes = self.0.get_blob::<Col2>()?;
+        let bytes = self.0.get_blob::<Col2>()?.expect("Constant value blob was NULL");
         Ok(match self.type_()? {
             ConstantType::Boolean => Boolean(bytes[0] != 0),
             ConstantType::Char => Char(LittleEndian::read_u16(bytes)),
@@ -169,6 +169,20 @@ impl<'db> CustomAttribute<'db> {
 
     pub fn type_(&self) -> Result<super::CustomAttributeType<'db>> {
         Ok(self.0.get_coded_index::<Col1, super::CustomAttributeType>()?.expect("CustomAttribute Type column must not be NULL"))
+    }
+
+    pub fn value(&'db self) -> Result<CustomAttributeSig<'db>> {
+        match self.0.get_blob::<Col2>()? {
+            None => Ok(CustomAttributeSig::default()), // empty value
+            Some(ref mut blob) => {
+                let ctor = self.type_()?;
+                let method_sig = match ctor {
+                    super::CustomAttributeType::MemberRef(ref mr) => mr.method_signature(),
+                    super::CustomAttributeType::MethodDef(ref md) => md.signature()
+                }?;
+                CustomAttributeSig::parse(blob, self.0.get_db(), &method_sig)
+            }
+        }
     }
 }
 
@@ -296,6 +310,11 @@ impl<'db> MemberRef<'db> {
         self.0.get_string::<Col1>()
     }
 
+    pub fn method_signature(&self) -> Result<MethodDefSig> {
+        // FIXME: this could also be a field signature (FieldSig) ...
+        MethodDefSig::parse(&mut self.0.get_blob::<Col2>()?.expect("MemberRef signature blob was NULL"), self.0.get_db())
+    }
+
     pub fn custom_attributes(&'db self) -> Result<TableRowIterator<'db, marker::CustomAttribute>> {
         self.0.get_list_by_key::<marker::CustomAttribute>(super::HasCustomAttribute::encode(self))
     }
@@ -318,8 +337,8 @@ impl<'db> MethodDef<'db> {
         self.0.get_string::<Col3>()
     }
 
-    pub fn signature(&self) -> Result<MethodDefSig> {
-        MethodDefSig::parse(&mut self.0.get_blob::<Col4>()?, self.0.get_db())
+    pub fn signature(&'db self) -> Result<MethodDefSig<'db>> {
+        MethodDefSig::parse(&mut self.0.get_blob::<Col4>()?.expect("MethodDef signature blob was NULL"), self.0.get_db())
     }
 
     pub fn param_list(&self) -> Result<TableRowIterator<'db, marker::Param>> {
@@ -525,7 +544,7 @@ impl<'db> ResolveToTypeDef<'db> for TypeRef<'db> {
 // ECMA-335, II.22.39
 impl<'db> TypeSpec<'db> {
     pub fn signature(&self) -> Result<TypeSpecSig> {
-        TypeSpecSig::parse(&mut self.0.get_blob::<Col0>()?, self.0.get_db())
+        TypeSpecSig::parse(&mut self.0.get_blob::<Col0>()?.expect("TypeSpec blob was NULL"), self.0.get_db())
     }
 
     pub fn custom_attributes(&'db self) -> Result<TableRowIterator<'db, marker::CustomAttribute>> {

@@ -1,6 +1,6 @@
 use std::fmt;
 use std::mem;
-use byteorder::ReadBytesExt;
+use byteorder::{ByteOrder, ReadBytesExt, LittleEndian};
 use crate::Result;
 use crate::core::db::{Database, CodedIndex};
 use super::TypeDefOrRef;
@@ -33,13 +33,15 @@ fn uncompress_signed(cursor: &mut &[u8]) -> Result<i32> {
 #[allow(non_upper_case_globals, dead_code)]
 mod bits {
     pub const CallingConvention_mask: u8 = 0x15; // 10101
-    pub const DEFAULT: u8 = 0x00;
-    pub const VARARG: u8 = 0x05;
-    pub const FIELD: u8 = 0x06;
-    pub const GENERIC: u8 = 0x10;
+    pub const DEFAULT: u8 = 0x00; // II.23.2.1
+    pub const VARARG: u8 = 0x05; // II.23.2.1
+    pub const FIELD: u8 = 0x06; // II.23.2.4
+    pub const PROPERTY: u8 = 0x08; // II.23.2.5
+    //pub const PROPERTY: u8 = 0x28; // what about this one? (II.23.2.5)
+    pub const GENERIC: u8 = 0x10; // II.23.2.1
 
-    pub const HASTHIS: u8 = 0x20;
-    pub const EXPLICITTHIS: u8 = 0x40;
+    pub const HASTHIS: u8 = 0x20; // II.23.2.1
+    pub const EXPLICITTHIS: u8 = 0x40; // II.23.2.1
 
     pub const ELEMENT_TYPE_END: u8 = 0x00;
     pub const ELEMENT_TYPE_VOID: u8 = 0x01;
@@ -95,6 +97,7 @@ pub struct MethodDefSig<'db> {
 impl<'db> MethodDefSig<'db> {
     pub(crate) fn parse(cur: &mut &'db [u8], db: &'db Database) -> Result<MethodDefSig<'db>> {
         let initial_byte = cur.read_u8()?;
+        assert!(initial_byte & bits::FIELD == 0 && initial_byte & bits::PROPERTY == 0);
         let generic_param_count = if initial_byte & bits::GENERIC != 0 {
             uncompress_unsigned(cur)?
         } else {
@@ -554,6 +557,79 @@ impl<'db> fmt::Debug for TypeSpecSig<'db> {
     }
 }
 
+// ECMA-335, II.23.3 (renamed to prevent name conflict with CustomAttribute table row)
+#[derive(Default)]
+pub struct CustomAttributeSig<'db> {
+    m_fixed: Vec<FixedArg<'db>>,
+    m_named: Vec<NamedArg<'db>>,
+}
+
+pub enum FixedArg<'db> {
+    Elem(Elem<'db>),
+    Array(Vec<Elem<'db>>)
+}
+
+impl<'db> FixedArg<'db> {
+    fn parse<'x>(cur: &mut &'db [u8], db: &'db Database, ctor_param: &'x ParamSig<'x>) -> Result<FixedArg<'db>> {
+        match ctor_param.kind() {
+            ParamKind::Type(Type::Array(_)) |
+            ParamKind::TypeByRef(Type::Array(_)) => {
+                // array parameter
+                unimplemented!()
+            },
+            _ => {
+                // no array parameter
+                unimplemented!()
+            }
+        }
+    }
+}
+
+pub struct NamedArg<'db> {
+    pub name: &'db str,
+    pub value: FixedArg<'db>
+}
+
+pub enum Elem<'db> {
+    Boolean(bool),
+    Char(u16),
+    Int8(i8),
+    UInt8(u8),
+    Int16(i16),
+    UInt16(u16),
+    Int32(i32),
+    UInt32(u32),
+    Int64(i64),
+    UInt64(u64),
+    Float32(f32),
+    Float64(f64),
+    String(Option<&'db str>),
+    SystemType(&'db str),
+    EnumValue // TODO
+}
+
+
+impl<'db> CustomAttributeSig<'db> {
+    pub(crate) fn parse<'x>(cur: &mut &'db [u8], db: &'db Database, ctor: &'x MethodDefSig<'x>) -> Result<CustomAttributeSig<'db>> {
+        let prolog = LittleEndian::read_u16(cur);
+        if prolog != 0x0001 {
+            return Err("CustomAttribute blobs must start with prolog of 0x0001".into());
+        }
+
+        let ctor_params = ctor.params();
+
+        let mut fixed_args = Vec::with_capacity(ctor_params.len());
+
+        for param in ctor_params {
+            fixed_args.push(FixedArg::parse(cur, db, param)?);
+        }
+
+        Ok(CustomAttributeSig {
+            m_fixed: fixed_args,
+            m_named: unimplemented!()
+        })
+    }
+}
 
 #[cfg(test)]
 mod tests {
