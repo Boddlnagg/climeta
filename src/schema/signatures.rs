@@ -1,7 +1,8 @@
 use std::fmt;
 use std::mem;
-use byteorder::{ByteOrder, ReadBytesExt, LittleEndian};
+use byteorder::{ReadBytesExt, LittleEndian};
 use crate::Result;
+use crate::ResolveToTypeDef;
 use crate::core::db::{Database, CodedIndex};
 use super::TypeDefOrRef;
 
@@ -27,6 +28,14 @@ fn uncompress_unsigned(cursor: &mut &[u8]) -> Result<u32> {
 #[allow(dead_code, unused_variables)]
 fn uncompress_signed(cursor: &mut &[u8]) -> Result<i32> {
     unimplemented!()
+}
+
+fn read_string<'db>(cursor: &mut &'db [u8]) -> Result<Option<&'db str>> {
+    let length = uncompress_unsigned(cursor)?;
+    if length == 0xff { return Ok(None); }
+    let (left, mut right) = cursor.split_at(length as usize);
+    mem::swap(cursor, &mut right);
+    Ok(Some(std::str::from_utf8(left).map_err(|_| crate::DecodeError("Invalid UTF8 in constant value"))?))
 }
 
 
@@ -87,6 +96,7 @@ mod bits {
 }
 
 // ECMA-335, II.23.2.1
+#[derive(Clone)]
 pub struct MethodDefSig<'db> {
     m_initial_byte: u8,
     m_generic_param_count: u32,
@@ -95,7 +105,7 @@ pub struct MethodDefSig<'db> {
 }
 
 impl<'db> MethodDefSig<'db> {
-    pub(crate) fn parse(cur: &mut &'db [u8], db: &'db Database) -> Result<MethodDefSig<'db>> {
+    pub(crate) fn parse(cur: &mut &'db [u8], db: &'db Database<'db>) -> Result<MethodDefSig<'db>> {
         let initial_byte = cur.read_u8()?;
         assert!(initial_byte & bits::FIELD == 0 && initial_byte & bits::PROPERTY == 0);
         let generic_param_count = if initial_byte & bits::GENERIC != 0 {
@@ -153,8 +163,39 @@ impl<'db> MethodDefSig<'db> {
 
 // TODO: impl Debug for MethodDefSig (s.a. II.15.3)
 
+
+// ECMA-335, II.23.2.4
+pub struct FieldSig<'db> {
+    m_type: Type<'db>,
+    m_cmod: Vec<CustomMod<'db>>,
+}
+
+impl<'db> FieldSig<'db> {
+    pub(crate) fn parse(cur: &mut &'db [u8], db: &'db Database) -> Result<FieldSig<'db>> {
+        let call_conv = uncompress_unsigned(cur)?;
+        if call_conv != bits::FIELD as u32 { return Err("FieldSig blob requires FIELD".into()); }
+
+        let cmod = CustomMod::parse(cur, db)?;
+        let typ = Type::parse(cur, db)?;
+
+        Ok(FieldSig {
+            m_type: typ,
+            m_cmod: cmod
+        })
+    }
+
+    pub fn type_(&self) -> &Type<'db> {
+        &self.m_type
+    }
+
+    pub fn custom_mod(&self) -> &[CustomMod<'db>] {
+        &self.m_cmod[..]
+    }
+}
+
 // TODO: this could also internally be Box<(Type, [CustomMod])>,
 //       where the tuple is dynamically sized, to have only one dynamic allocation
+#[derive(Clone)]
 pub struct Array<'db> {
     m_type: Box<Type<'db>>,
     m_cmod: Vec<CustomMod<'db>>
@@ -204,13 +245,13 @@ impl<'db> fmt::Debug for TypeTag {
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq, Eq)]
 pub enum GenericVarScope {
     Type,
     Method
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq, Eq)]
 pub enum PrimitiveType {
     Boolean,
     Char,
@@ -226,6 +267,27 @@ pub enum PrimitiveType {
     R8,
     I,
     U,
+}
+
+impl PrimitiveType {
+    fn parse_value<'db>(&self, cur: &mut &'db [u8]) -> Result<super::PrimitiveValue> {
+        use super::PrimitiveValue::*;
+        Ok(match self {
+            PrimitiveType::Boolean => Boolean(cur.read_u8()? != 0),
+            PrimitiveType::Char => Char(cur.read_u16::<LittleEndian>()?),
+            PrimitiveType::I1 => Int8(cur.read_i8()?),
+            PrimitiveType::U1 => UInt8(cur.read_u8()?),
+            PrimitiveType::I2 => Int16(cur.read_i16::<LittleEndian>()?),
+            PrimitiveType::U2 => UInt16(cur.read_u16::<LittleEndian>()?),
+            PrimitiveType::I4 => Int32(cur.read_i32::<LittleEndian>()?),
+            PrimitiveType::U4 => UInt32(cur.read_u32::<LittleEndian>()?),
+            PrimitiveType::I8 => Int64(cur.read_i64::<LittleEndian>()?),
+            PrimitiveType::U8 => UInt64(cur.read_u64::<LittleEndian>()?),
+            PrimitiveType::R4 => Float32(cur.read_f32::<LittleEndian>()?),
+            PrimitiveType::R8 => Float64(cur.read_f64::<LittleEndian>()?),
+            PrimitiveType::I | PrimitiveType::U => return Err("Primitive value of type I or U not supported".into())
+        })
+    }
 }
 
 impl fmt::Debug for PrimitiveType {
@@ -252,6 +314,7 @@ impl fmt::Debug for PrimitiveType {
 }
 
 // ECMA-335, II.23.2.12
+#[derive(Clone)]
 pub enum Type<'db> {
     Primitive(PrimitiveType),
     Array(Array<'db>), // for ARRAY and SZARRAY
@@ -357,6 +420,7 @@ impl<'db> fmt::Debug for Type<'db> {
     }
 }
 
+#[derive(Clone)]
 pub enum RetTypeKind<'db> {
     Void,
     Type(Type<'db>),
@@ -379,6 +443,7 @@ impl<'db> fmt::Debug for RetTypeKind<'db> {
 }
 
 // ECMA-335, II.23.2.11
+#[derive(Clone)]
 pub struct RetType<'db> {
     m_cmod: Vec<CustomMod<'db>>,
     m_kind: RetTypeKind<'db>,
@@ -415,6 +480,7 @@ impl<'db> RetType<'db> {
     }
 }
 
+#[derive(Clone)]
 pub enum ParamKind<'db> {
     Type(Type<'db>),
     TypeByRef(Type<'db>),
@@ -435,6 +501,7 @@ impl<'db> fmt::Debug for ParamKind<'db> {
 }
 
 // ECMA-335, II.23.2.10 (renamed to prevent name conflict with Param table row)
+#[derive(Clone)]
 pub struct ParamSig<'db> {
     m_cmod: Vec<CustomMod<'db>>,
     m_kind: ParamKind<'db>,
@@ -477,6 +544,7 @@ pub enum CustomModTag {
 }
 
 // ECMA-335, II.23.2.7
+#[derive(Clone)]
 pub struct CustomMod<'db> {
     m_tag: CustomModTag,
     m_type: TypeDefOrRef<'db>
@@ -564,54 +632,107 @@ pub struct CustomAttributeSig<'db> {
     m_named: Vec<NamedArg<'db>>,
 }
 
+impl<'db> CustomAttributeSig<'db> {
+    pub fn fixed_args(&self) -> &[FixedArg<'db>] {
+        &self.m_fixed[..]
+    }
+
+    pub fn named_args(&self) -> &[NamedArg<'db>] {
+        &self.m_named[..]
+    }
+}
+
+#[derive(Debug)]
 pub enum FixedArg<'db> {
     Elem(Elem<'db>),
     Array(Vec<Elem<'db>>)
 }
 
 impl<'db> FixedArg<'db> {
-    fn parse<'x>(cur: &mut &'db [u8], db: &'db Database, ctor_param: &'x ParamSig<'x>) -> Result<FixedArg<'db>> {
+    fn parse<'c, 'd: 'db>(cur: &mut &'db [u8], db: &'db Database<'db>, cache: &'c crate::Cache<'d>, ctor_param: &ParamSig<'db>) -> Result<FixedArg<'db>> {
         match ctor_param.kind() {
-            ParamKind::Type(Type::Array(_)) |
-            ParamKind::TypeByRef(Type::Array(_)) => {
+            ParamKind::Type(Type::Array(_)) => {
                 // array parameter
                 unimplemented!()
             },
-            _ => {
+            ParamKind::Type(t) => {
                 // no array parameter
-                unimplemented!()
-            }
+                Ok(FixedArg::Elem(Elem::parse(cur, db, cache, t)?))
+            },
+            _ => unimplemented!()
         }
     }
 }
 
+#[derive(Debug)]
 pub struct NamedArg<'db> {
     pub name: &'db str,
     pub value: FixedArg<'db>
 }
 
+impl<'db> NamedArg<'db> {
+    fn parse(cur: &mut &'db [u8], db: &'db Database) -> Result<NamedArg<'db>> {
+        unimplemented!()
+    }
+}
+
+fn enum_get_underlying_type(typ: &super::TypeDef) -> Result<PrimitiveType> {
+    use PrimitiveType::*;
+
+    debug_assert!(typ.is_enum());
+    let mut result = None;
+    for field in typ.field_list()? {
+        let flags = field.flags()?;
+        if !flags.literal() && !flags.static_() {
+            debug_assert!(result.is_none());
+            let typ = match field.signature()?.type_() {
+                Type::Primitive(p) => *p,
+                _ => return Err("enum underlying type must be primitive".into())
+            };
+            assert!(match typ { Boolean | Char | I1 | U1 | I2 | U2 | I4 | U4 | I8 | U8 => true, _ => false });
+            result = Some(typ);
+        }
+    }
+    Ok(result.expect("enum without underlying type"))
+}
+
+#[derive(Clone, Debug)]
 pub enum Elem<'db> {
-    Boolean(bool),
-    Char(u16),
-    Int8(i8),
-    UInt8(u8),
-    Int16(i16),
-    UInt16(u16),
-    Int32(i32),
-    UInt32(u32),
-    Int64(i64),
-    UInt64(u64),
-    Float32(f32),
-    Float64(f64),
+    Primitive(super::PrimitiveValue),
     String(Option<&'db str>),
     SystemType(&'db str),
-    EnumValue // TODO
+    EnumValue(super::TypeDef<'db>, super::PrimitiveValue)
+}
+
+impl<'db> Elem<'db> {
+    fn parse<'c, 'd: 'db>(cur: &mut &'db [u8], db: &'db Database, cache: &'c crate::Cache<'d>, typ: &Type<'db>) -> Result<Elem<'db>> {
+        //println!("Parsing Elem: {:?}", cur);
+        let r = Ok(match typ {
+            Type::Primitive(p) => {
+                Elem::Primitive(p.parse_value(cur)?)
+            },
+            Type::Ref(_, t, None) if t.namespace_name_pair() == ("System", "Type") => {
+                Elem::SystemType(read_string(cur)?.expect("NULL string in System.Type custom attribute value"))
+            },
+            Type::Ref(TypeTag::ValueType, t, None) => {
+                let resolved = t.resolve(cache).ok_or::<crate::DecodeError>("Unresolvable CustomAttribute param TypeDefOrRef".into())?;
+                if !resolved.is_enum() {
+                    return Err("CustomAttribute params that are TypeDefOrRef must be an enum or System.Type".into())
+                }
+                let underlying = enum_get_underlying_type(&resolved)?;
+                Elem::EnumValue(resolved.clone(), underlying.parse_value(cur)?)
+            },
+            _ => unimplemented!()
+        });
+        //println!("{:?}", r);
+        r
+    }
 }
 
 
 impl<'db> CustomAttributeSig<'db> {
-    pub(crate) fn parse<'x>(cur: &mut &'db [u8], db: &'db Database, ctor: &'x MethodDefSig<'x>) -> Result<CustomAttributeSig<'db>> {
-        let prolog = LittleEndian::read_u16(cur);
+    pub(crate) fn parse<'c, 'd: 'db>(cur: &mut &'db [u8], db: &'db Database<'db>, cache: &'c crate::Cache<'d>, ctor: &MethodDefSig<'db>) -> Result<CustomAttributeSig<'db>> {
+        let prolog = cur.read_u16::<LittleEndian>()?;
         if prolog != 0x0001 {
             return Err("CustomAttribute blobs must start with prolog of 0x0001".into());
         }
@@ -621,12 +742,19 @@ impl<'db> CustomAttributeSig<'db> {
         let mut fixed_args = Vec::with_capacity(ctor_params.len());
 
         for param in ctor_params {
-            fixed_args.push(FixedArg::parse(cur, db, param)?);
+            fixed_args.push(FixedArg::parse(cur, db, cache, param)?);
+        }
+
+        let named_args_count = cur.read_u16::<LittleEndian>()?;
+        let mut named_args = Vec::with_capacity(named_args_count as usize);
+
+        for _ in 0.. named_args_count {
+            named_args.push(NamedArg::parse(cur, db)?);
         }
 
         Ok(CustomAttributeSig {
             m_fixed: fixed_args,
-            m_named: unimplemented!()
+            m_named: named_args
         })
     }
 }

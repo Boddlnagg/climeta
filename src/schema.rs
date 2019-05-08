@@ -89,6 +89,8 @@ pub mod marker {
 
 macro_rules! coded_index {
     ($name:ident[$bits:tt] { $($n:tt => $ty:ident),+ }) => {
+
+        #[derive(Clone)]
         pub enum $name<'db> {
             $($ty(rows::$ty<'db>)),+
         }
@@ -268,7 +270,7 @@ impl<'db> ResolveToTypeDef<'db> for TypeDefOrRef<'db> {
         }
     }
 
-    fn resolve(&self, cache: &'db Cache<'db>) -> Option<TypeDef<'db>> {
+    fn resolve<'c, 'd: 'db>(&self, cache: &'c Cache<'d>) -> Option<TypeDef<'db>> {
         match self {
             TypeDefOrRef::TypeDef(d) => Some(d.clone()),
             TypeDefOrRef::TypeRef(r) => r.resolve(cache),
@@ -297,9 +299,8 @@ pub enum ConstantType {
     Class = 0x12
 }
 
-// ECMA-335, II.16.2
-#[derive(Copy, Clone)]
-pub enum FieldInit<'db> {
+#[derive(Copy, Clone, PartialEq)]
+pub enum PrimitiveValue {
     Boolean(bool),
     Char(u16),
     Int8(i8),
@@ -312,13 +313,11 @@ pub enum FieldInit<'db> {
     UInt64(u64),
     Float32(f32),
     Float64(f64),
-    String(Option<&'db str>),
-    NullRef
 }
 
-impl<'db> fmt::Debug for FieldInit<'db> {
+impl<'db> fmt::Debug for PrimitiveValue {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        use FieldInit::*;
+        use PrimitiveValue::*;
         match self {
             Boolean(v) => write!(f, "bool({})", v),
             Char(v) => write!(f, "char({})", v),
@@ -331,7 +330,24 @@ impl<'db> fmt::Debug for FieldInit<'db> {
             Int64(v) => write!(f, "int64({})", v),
             UInt64(v) => write!(f, "unsigned int64({})", v),
             Float32(v) => write!(f, "float32({})", v),
-            Float64(v) => write!(f, "float64({})", v),
+            Float64(v) => write!(f, "float64({})", v)
+        }
+    }
+}
+
+// ECMA-335, II.16.2
+#[derive(Copy, Clone, PartialEq)]
+pub enum FieldInit<'db> {
+    Primitive(PrimitiveValue),
+    String(Option<&'db str>),
+    NullRef
+}
+
+impl<'db> fmt::Debug for FieldInit<'db> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use FieldInit::*;
+        match self {
+            Primitive(p) => write!(f, "{:?}", p),
             String(Some(v)) => write!(f, "{:?}", v),
             NullRef | String(None) => write!(f, "nullref"),
         }

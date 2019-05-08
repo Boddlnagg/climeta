@@ -19,7 +19,7 @@ use crate::core::db;
 
 pub mod schema;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct DecodeError(&'static str);
 
 impl Error for DecodeError {}
@@ -256,7 +256,7 @@ impl<'db> Cache<'db> {
         db
     }
 
-    pub fn find(&'db self, type_namespace: &str, type_name: &str) -> Option<schema::TypeDef<'db>> {
+    pub fn find(&self, type_namespace: &str, type_name: &str) -> Option<schema::TypeDef<'db>> {
         let map = self.namespace_map.borrow();
         map.get(type_namespace).and_then(|ns| ns.types.get(type_name).map(|t| t.clone()))
     }
@@ -296,7 +296,7 @@ struct MemberCache<'db> {
 
 pub trait ResolveToTypeDef<'db> {
     fn namespace_name_pair(&self) -> (&'db str, &'db str);
-    fn resolve(&self, cache: &'db Cache<'db>) -> Option<schema::TypeDef<'db>> {
+    fn resolve<'c, 'd: 'db>(&self, cache: &'c Cache<'d>) -> Option<schema::TypeDef<'db>> {
         let (namespace, name) = self.namespace_name_pair();
         cache.find(namespace, name)
     }
