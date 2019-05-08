@@ -1,4 +1,4 @@
-use crate::core::db::{self, TableDesc, TableKind, Database};
+use crate::core::db::{self, TableDesc, TableKind, TableDescWithKey, Database};
 use crate::{TableRow, TableRowAccess};
 use crate::Result;
 
@@ -173,6 +173,10 @@ impl<'db, T: TableKind> Row<'db, T> where &'db T: TableRowAccess<Table=Table<'db
         }
     }
 
+    pub(crate) fn get_index(&self) -> u32 {
+        self.m_row
+    }
+
     pub(crate) fn get_db(&self) -> &'db Database {
         self.m_table.db
     }
@@ -238,5 +242,24 @@ impl<'db, T: TableKind> Row<'db, T> where &'db T: TableRowAccess<Table=Table<'db
         let row = self.get_value::<Col, u32>()?;
         assert!(row != 0);
         target_table.get_row(row - 1)
+    }
+
+    pub(crate) fn get_list_by_key<Target: TableDescWithKey>(&self, encoded_idx: u32) -> Result<TableRowIterator<'db, Target>>
+        where db::Database<'db>: db::TableInfoAccess<'db, Target>,
+              Target::Columns: crate::core::columns::ColumnTupleAccess<Target::KeyColumn>,
+              u32: ReadValue<<Target::Columns as crate::core::columns::ColumnTupleAccess<Target::KeyColumn>>::Out>,
+              &'db Target: TableRowAccess<Table=Table<'db, Target>>,
+              <&'db Target as TableRowAccess>::Out: TableRow<Kind=Target>
+    {
+        let target_table = self.m_table.db.get_table::<<&'db Target as TableRowAccess>::Out>();
+        let (begin, end) = crate::core::equal_range_with(0, target_table.len() as usize, |i| {
+                                target_table.get_value::<Target::KeyColumn, u32>(i as u32).unwrap()
+                            }, encoded_idx);
+
+        Ok(TableRowIterator {
+            m_table: target_table,
+            m_row: begin as u32,
+            m_end: end as u32
+        })
     }
 }

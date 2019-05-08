@@ -211,6 +211,7 @@ impl<'db> Database<'db> {
 
 pub trait TableRow {
     type Kind: db::TableKind;
+    fn get_index(&self) -> u32;
 }
 
 pub trait TableRowAccess {

@@ -2,7 +2,7 @@ use std::fmt;
 
 use crate::{Result, Cache, ResolveToTypeDef};
 
-use crate::core::db::{Database, Tables, CodedIndex};
+use crate::core::db::{Database, Tables, CodedIndex, CodedIndexEncode};
 use crate::core::columns::DynamicSize;
 
 pub mod flags;
@@ -32,12 +32,19 @@ macro_rules! table_kind {
         impl TableDesc for $ty {
             type Columns = ($($colty),+ ,);
         }
+    };
+    ($ty:ident [$($colty:ty),+] key $key:ident) => {
+        table_kind!($ty [$($colty),+]);
+
+        impl TableDescWithKey for $ty {
+            type KeyColumn = crate::core::columns::$key;
+        }
     }
 }
 
 pub mod marker {
     use crate::core::table::{Table, Row};
-    use crate::core::db::{TableKind, TableDesc};
+    use crate::core::db::{TableKind, TableDesc, TableDescWithKey};
     use crate::core::columns::{FixedSize2, FixedSize4, FixedSize8, DynamicSize};
 
     table_kind!(Assembly [FixedSize4, FixedSize8, FixedSize4, DynamicSize, DynamicSize, DynamicSize]);
@@ -46,31 +53,31 @@ pub mod marker {
     table_kind!(AssemblyRef [FixedSize8, FixedSize4, DynamicSize, DynamicSize, DynamicSize, DynamicSize]);
     table_kind!(AssemblyRefOS [FixedSize4, FixedSize4, FixedSize4, DynamicSize]);
     table_kind!(AssemblyRefProcessor [FixedSize4, DynamicSize]);
-    table_kind!(ClassLayout [FixedSize2, FixedSize4, DynamicSize]);
-    table_kind!(Constant [FixedSize2, DynamicSize, DynamicSize]);
-    table_kind!(CustomAttribute [DynamicSize, DynamicSize, DynamicSize]);
-    table_kind!(DeclSecurity [FixedSize2, DynamicSize, DynamicSize]);
+    table_kind!(ClassLayout [FixedSize2, FixedSize4, DynamicSize] key Col2 /*Parent*/);
+    table_kind!(Constant [FixedSize2, DynamicSize, DynamicSize] key Col1 /*Parent*/);
+    table_kind!(CustomAttribute [DynamicSize, DynamicSize, DynamicSize] key Col0 /*Parent*/);
+    table_kind!(DeclSecurity [FixedSize2, DynamicSize, DynamicSize] key Col1 /*Parent*/);
     table_kind!(Event [FixedSize2, DynamicSize, DynamicSize]);
     table_kind!(EventMap [DynamicSize, DynamicSize]);
     table_kind!(ExportedType [FixedSize4, FixedSize4, DynamicSize, DynamicSize, DynamicSize]);
     table_kind!(Field [FixedSize2, DynamicSize, DynamicSize]);
-    table_kind!(FieldLayout [FixedSize4, DynamicSize]);
-    table_kind!(FieldMarshal [DynamicSize, DynamicSize]);
-    table_kind!(FieldRVA [FixedSize4, DynamicSize]);
+    table_kind!(FieldLayout [FixedSize4, DynamicSize] key Col1 /*Field*/);
+    table_kind!(FieldMarshal [DynamicSize, DynamicSize] key Col0 /*Parent*/);
+    table_kind!(FieldRVA [FixedSize4, DynamicSize] key Col1 /*Field*/);
     table_kind!(File [FixedSize4, DynamicSize, DynamicSize]);
-    table_kind!(GenericParam [FixedSize2, FixedSize2, DynamicSize, DynamicSize]);
-    table_kind!(GenericParamConstraint [DynamicSize, DynamicSize]);
-    table_kind!(ImplMap [FixedSize2, DynamicSize, DynamicSize, DynamicSize]);
-    table_kind!(InterfaceImpl [DynamicSize, DynamicSize]);
+    table_kind!(GenericParam [FixedSize2, FixedSize2, DynamicSize, DynamicSize] key Col2 /*Owner*/);
+    table_kind!(GenericParamConstraint [DynamicSize, DynamicSize] key Col0 /*Owner*/);
+    table_kind!(ImplMap [FixedSize2, DynamicSize, DynamicSize, DynamicSize] key Col1 /*MemberForwarded*/);
+    table_kind!(InterfaceImpl [DynamicSize, DynamicSize] key Col0 /*Class*/);
     table_kind!(ManifestResource [FixedSize4, FixedSize4, DynamicSize, DynamicSize]);
     table_kind!(MemberRef [DynamicSize, DynamicSize, DynamicSize]);
     table_kind!(MethodDef [FixedSize4, FixedSize2, FixedSize2, DynamicSize, DynamicSize, DynamicSize]);
-    table_kind!(MethodImpl [DynamicSize, DynamicSize, DynamicSize]);
-    table_kind!(MethodSemantics [FixedSize2, DynamicSize, DynamicSize]);
+    table_kind!(MethodImpl [DynamicSize, DynamicSize, DynamicSize] key Col0 /*Class*/);
+    table_kind!(MethodSemantics [FixedSize2, DynamicSize, DynamicSize] key Col2 /*Association*/);
     table_kind!(MethodSpec [DynamicSize, DynamicSize]);
     table_kind!(Module [FixedSize2, DynamicSize, DynamicSize, DynamicSize, DynamicSize]);
     table_kind!(ModuleRef [DynamicSize]);
-    table_kind!(NestedClass [DynamicSize, DynamicSize]);
+    table_kind!(NestedClass [DynamicSize, DynamicSize] key Col0 /*NestedClass*/);
     table_kind!(Param [FixedSize2, FixedSize2, DynamicSize]);
     table_kind!(Property [FixedSize2, DynamicSize, DynamicSize]);
     table_kind!(PropertyMap [DynamicSize, DynamicSize]);
@@ -89,10 +96,11 @@ macro_rules! coded_index {
         impl<'db> CodedIndex for $name<'db> {
             type Database = &'db Database<'db>;
             type Tables = &'db Tables<'db>;
+            const TAG_BITS: u8 = $bits;
 
             fn decode(idx: u32, db: Self::Database) -> Result<Option<Self>> {
-                let tag = idx & ((1 << $bits) - 1);
-                let row = idx >> $bits as u32;
+                let tag = idx & ((1 << Self::TAG_BITS) - 1);
+                let row = idx >> Self::TAG_BITS as u32;
                 if row == 0 {
                     return Ok(None);
                 }
@@ -104,13 +112,19 @@ macro_rules! coded_index {
             }
 
             fn index_size(tables: Self::Tables) -> DynamicSize {
-                if $(Self::needs_4byte_index(tables.get_table_info::<marker::$ty>().m_row_count, $bits))||+ {
+                if $(Self::needs_4byte_index(tables.get_table_info::<marker::$ty>().m_row_count, Self::TAG_BITS))||+ {
                     DynamicSize::Size4
                 } else {
                     DynamicSize::Size2
                 }
             }
         }
+
+        $(
+        impl<'db> CodedIndexEncode<marker::$ty> for $name<'db> {
+            const TAG: u8 = $n;
+        }
+        )+
 
         impl<'db> std::fmt::Debug for $name<'db> {
             fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {

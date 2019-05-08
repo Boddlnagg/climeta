@@ -65,3 +65,65 @@ impl ByteView for [u8] {
         &self[start..(start + len)]
     }
 }
+
+/// Returns the index of the first element in the range [start, end), whose mapping
+/// (after being fed to `mapping`) is not less than (i.e. greater or equal to) `x`,
+/// or `end` if no such element is found. 
+pub(crate) fn lower_bound_with<T: Ord + Copy, F>(start: usize, end: usize, mapping: F, x: T) -> usize
+    where F: Fn(usize) -> T
+{
+    debug_assert!(end >= start);
+    let mut size = end - start;
+    if size == 0 {
+        return start;
+    }
+    let mut base = start;
+    while size > 1 {
+        let half = size / 2;
+        let mid = base + half;
+        base = if mapping(mid) < x { mid } else { base };
+        size -= half;
+    }
+    base + (mapping(base) < x) as usize
+}
+
+pub(crate) fn equal_range_with<T: Ord + Copy, F: Clone>(start: usize, end: usize, mapping: F, x: T) -> (usize, usize)
+    where F: Fn(usize) -> T
+{
+    let lower = lower_bound_with(start, end, mapping.clone(), x);
+    let mut upper = lower;
+    while upper < end && mapping(upper) == x {
+        upper += 1;
+    }
+    (lower, upper)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_lower_bound_with() {
+        let slice = &[0, 0, 1, 2, 4, 4, 4, 8, 16, 16];
+        assert_eq!(lower_bound_with(0, 10, |idx| slice[idx], 0), 0);
+        assert_eq!(lower_bound_with(0, 10, |idx| slice[idx], 1), 2);
+        assert_eq!(lower_bound_with(1, 10, |idx| slice[idx], 1), 2);
+        assert_eq!(lower_bound_with(3, 10, |idx| slice[idx], 1), 3);
+        assert_eq!(lower_bound_with(0, 10, |idx| slice[idx], 16), 8);
+        assert_eq!(lower_bound_with(0, 10, |idx| slice[idx], 17), 10);
+        assert_eq!(lower_bound_with(7, 7, |idx| slice[idx], 0), 7); // empty input range
+    }
+
+    #[test]
+    fn test_equal_range_with() {
+        let slice = &[0, 0, 1, 2, 4, 4, 4, 8, 16, 16];
+        assert_eq!(equal_range_with(0, 10, |idx| slice[idx], 0), (0, 2));
+        assert_eq!(equal_range_with(0, 10, |idx| slice[idx], 1), (2, 3));
+        assert_eq!(equal_range_with(3, 10, |idx| slice[idx], 0), (3, 3)); // empty output range
+        assert_eq!(equal_range_with(0, 10, |idx| slice[idx], 3), (4, 4));
+        assert_eq!(equal_range_with(0, 10, |idx| slice[idx], 4), (4, 7));
+        assert_eq!(equal_range_with(0, 10, |idx| slice[idx], 16), (8, 10));
+        assert_eq!(equal_range_with(0, 8, |idx| slice[idx], 16), (8, 8));
+        assert_eq!(equal_range_with(7, 7, |idx| slice[idx], 0), (7, 7)); // empty input range
+    }
+}

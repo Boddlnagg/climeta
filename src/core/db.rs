@@ -5,16 +5,21 @@ use std::io;
 
 use crate::Result;
 use crate::schema;
+use crate::TableRow;
 use crate::core::pe;
 use crate::core::table::{TableInfo, Table};
 use crate::core::ByteView;
-use crate::core::columns::{FixedSize2, FixedSize4, FixedSize8, DynamicSize};
+use crate::core::columns::{ColumnIndex, FixedSize2, FixedSize4, FixedSize8, DynamicSize};
 
 
 pub trait TableKind: Copy {}
 
 pub(crate) trait TableDesc: TableKind {
     type Columns;
+}
+
+pub(crate) trait TableDescWithKey: TableDesc /*where Self: ColumnAccess<Self::KeyColumn>*/ {
+    type KeyColumn: ColumnIndex;
 }
 
 pub(crate) trait TableInfoAccess<'db, T> {
@@ -129,12 +134,22 @@ impl<'db> Tables<'db> {
 pub(crate) trait CodedIndex : Sized {
     type Database;
     type Tables;
+    const TAG_BITS: u8;
 
     fn decode(idx: u32, db: Self::Database) -> Result<Option<Self>>;
     fn index_size(tables: Self::Tables) -> DynamicSize;
     fn needs_4byte_index(row_count: u32, tag_bits: u8) -> bool {
         row_count >= (1u32 << (16 - tag_bits))
     }
+    fn encode<T: TableRow>(row: &T) -> u32
+        where Self: CodedIndexEncode<T::Kind>
+    {
+        ((row.get_index() + 1) << Self::TAG_BITS as u32) | <Self as CodedIndexEncode<T::Kind>>::TAG as u32
+    }
+}
+
+pub(crate) trait CodedIndexEncode<T: TableKind>: CodedIndex {
+    const TAG: u8;
 }
 
 pub(crate) struct Database<'db> {
