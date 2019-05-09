@@ -174,7 +174,7 @@ impl<'db> CustomAttribute<'db> {
         Ok(self.0.get_coded_index::<Col1, super::CustomAttributeType>()?.expect("CustomAttribute Type column must not be NULL"))
     }
 
-    pub fn value<'c, 'd: 'db>(&self, cache: &'c crate::Cache<'d>) -> Result<CustomAttributeSig<'db>> {
+    pub fn value<'c: 'db>(&self, cache: &Cache<'c>) -> Result<CustomAttributeSig<'db>> {
         match self.0.get_blob::<Col2>()? {
             None => Ok(CustomAttributeSig::default()), // empty value
             Some(ref mut blob) => {
@@ -524,7 +524,7 @@ impl<'db> ResolveToTypeDef<'db> for TypeDef<'db> {
         (namespace, name)
     }
 
-    fn resolve<'c, 'd: 'db>(&self, _cache: &'c Cache<'d>) -> Option<schema::TypeDef<'db>> {
+    fn resolve<'c: 'db>(&self, _cache: &Cache<'c>) -> Option<schema::TypeDef<'db>> {
         Some(self.clone())
     }
 }

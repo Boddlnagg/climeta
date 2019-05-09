@@ -296,7 +296,7 @@ struct MemberCache<'db> {
 
 pub trait ResolveToTypeDef<'db> {
     fn namespace_name_pair(&self) -> (&'db str, &'db str);
-    fn resolve<'c, 'd: 'db>(&self, cache: &'c Cache<'d>) -> Option<schema::TypeDef<'db>> {
+    fn resolve<'c: 'db>(&self, cache: &Cache<'c>) -> Option<schema::TypeDef<'db>> {
         let (namespace, name) = self.namespace_name_pair();
         cache.find(namespace, name)
     }

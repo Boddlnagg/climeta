@@ -1,7 +1,7 @@
 use std::mem;
 use byteorder::{ReadBytesExt, LittleEndian};
 use crate::Result;
-use crate::ResolveToTypeDef;
+use crate::{Cache, ResolveToTypeDef};
 use crate::core::db::Database;
 use super::{Type, TypeTag, PrimitiveType, MethodDefSig, ParamKind, bits};
 
@@ -21,7 +21,7 @@ pub struct CustomAttributeSig<'db> {
 }
 
 impl<'db> CustomAttributeSig<'db> {
-    pub(crate) fn parse<'c, 'd: 'db>(cur: &mut &'db [u8], db: &'db Database<'db>, cache: &'c crate::Cache<'d>, ctor: &MethodDefSig<'db>) -> Result<CustomAttributeSig<'db>> {
+    pub(crate) fn parse<'c: 'db>(cur: &mut &'db [u8], db: &'db Database<'db>, cache: &Cache<'c>, ctor: &MethodDefSig<'db>) -> Result<CustomAttributeSig<'db>> {
         let prolog = cur.read_u16::<LittleEndian>()?;
         if prolog != 0x0001 {
             return Err("CustomAttribute blobs must start with prolog of 0x0001".into());
@@ -70,7 +70,7 @@ pub enum FixedArg<'db> {
 }
 
 impl<'db> FixedArg<'db> {
-    fn parse<'d: 'db>(cur: &mut &'db [u8], db: &'db Database, kind: ElemKind<'d>) -> Result<FixedArg<'db>> {
+    fn parse<'c: 'db>(cur: &mut &'db [u8], db: &'db Database, kind: ElemKind<'c>) -> Result<FixedArg<'db>> {
         Ok(match kind {
             ElemKind::Elem(t) => FixedArg::Elem(t.parse_value(cur)?),
             ElemKind::Array(t) => FixedArg::Array(unimplemented!()) // TODO
@@ -91,7 +91,7 @@ pub struct NamedArg<'db> {
 }
 
 impl<'db> NamedArg<'db> {
-    fn parse<'c, 'd: 'db>(cur: &mut &'db [u8], db: &'db Database, cache: &'c crate::Cache<'d>) -> Result<NamedArg<'db>> {
+    fn parse<'c: 'db>(cur: &mut &'db [u8], db: &'db Database, cache: &Cache<'c>) -> Result<NamedArg<'db>> {
         let is_property = match cur.read_u8()? {
             bits::ARG_FIELD => false,
             bits::ARG_PROPERTY => true,
@@ -140,7 +140,7 @@ enum FieldOrPropType<'db> {
 }
 
 impl<'db> FieldOrPropType<'db> {
-    fn from_fixed_arg_type<'c, 'd: 'db>(typ: &Type<'db>, cache: &'c crate::Cache<'d>) -> Result<FieldOrPropType<'db>> {
+    fn from_fixed_arg_type<'c: 'db>(typ: &Type<'db>, cache: &Cache<'c>) -> Result<FieldOrPropType<'db>> {
         Ok(match typ {
             Type::Primitive(PrimitiveType::I) | Type::Primitive(PrimitiveType::U) => return Err("FieldOrPropType can not have type I or U".into()),
             Type::Primitive(p) => FieldOrPropType::Primitive(*p),
@@ -159,7 +159,7 @@ impl<'db> FieldOrPropType<'db> {
         })
     }
 
-    fn parse<'c, 'd: 'db>(cur: &mut &'db [u8], db: &'db Database<'db>, cache: &'c crate::Cache<'d>) -> Result<FieldOrPropType<'db>> {
+    fn parse<'c: 'db>(cur: &mut &'db [u8], db: &'db Database<'db>, cache: &Cache<'c>) -> Result<FieldOrPropType<'db>> {
         Ok(match cur.read_u8()? {
             bits::ELEMENT_TYPE_BOOLEAN => FieldOrPropType::Primitive(PrimitiveType::Boolean),
             bits::ELEMENT_TYPE_CHAR => FieldOrPropType::Primitive(PrimitiveType::Char),
@@ -207,14 +207,14 @@ enum ElemKind<'db> {
 }
 
 impl<'db> ElemKind<'db> {
-    fn from_fixed_arg_type<'c, 'd: 'db>(typ: &Type<'db>, cache: &'c crate::Cache<'d>) -> Result<ElemKind<'db>> {
+    fn from_fixed_arg_type<'c: 'db>(typ: &Type<'db>, cache: &Cache<'c>) -> Result<ElemKind<'db>> {
         Ok(match typ {
             Type::Array(array) => ElemKind::Array(FieldOrPropType::from_fixed_arg_type(array.elem_type(), cache)?),
             _ => ElemKind::Elem(FieldOrPropType::from_fixed_arg_type(typ, cache)?)
         })
     }
 
-    fn parse<'c, 'd: 'db>(cur: &mut &'db [u8], db: &'db Database<'db>, cache: &'c crate::Cache<'d>) -> Result<ElemKind<'db>> {
+    fn parse<'c: 'db>(cur: &mut &'db [u8], db: &'db Database<'db>, cache: &Cache<'c>) -> Result<ElemKind<'db>> {
         let mut cur_clone = cur.clone(); // maybe we need to rewind
         let element_type = cur.read_u8()?;
         Ok(match element_type {

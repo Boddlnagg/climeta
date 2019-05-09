@@ -272,7 +272,7 @@ impl<'db> ResolveToTypeDef<'db> for TypeDefOrRef<'db> {
         }
     }
 
-    fn resolve<'c, 'd: 'db>(&self, cache: &'c Cache<'d>) -> Option<TypeDef<'db>> {
+    fn resolve<'c: 'db>(&self, cache: &Cache<'c>) -> Option<TypeDef<'db>> {
         match self {
             TypeDefOrRef::TypeDef(d) => Some(d.clone()),
             TypeDefOrRef::TypeRef(r) => r.resolve(cache),
