@@ -512,7 +512,7 @@ impl<'db> fmt::Debug for TypeDef<'db> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let (namespace, name) = self.namespace_name_pair();
         // TODO: can we do something more principled here?
-        write!(f, "[TypeDef] {}.{}", namespace, name)
+        write!(f, "TypeDef(\"{}.{}\")", namespace, name)
     }
 }
 
@@ -552,6 +552,14 @@ impl<'db> ResolveToTypeDef<'db> for TypeRef<'db> {
         let namespace = self.type_namespace().unwrap_or("");
         let name = self.type_name().expect("TypeRef without type name");
         (namespace, name)
+    }
+}
+
+impl<'db> fmt::Debug for TypeRef<'db> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let (namespace, name) = self.namespace_name_pair();
+        // TODO: can we do something more principled here?
+        write!(f, "TypeRef(\"{}.{}\")", namespace, name)
     }
 }
 

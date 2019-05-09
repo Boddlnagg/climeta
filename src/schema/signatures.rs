@@ -650,18 +650,11 @@ pub enum FixedArg<'db> {
 }
 
 impl<'db> FixedArg<'db> {
-    fn parse<'c, 'd: 'db>(cur: &mut &'db [u8], db: &'db Database<'db>, cache: &'c crate::Cache<'d>, ctor_param: &ParamSig<'db>) -> Result<FixedArg<'db>> {
-        match ctor_param.kind() {
-            ParamKind::Type(Type::Array(_)) => {
-                // array parameter
-                unimplemented!()
-            },
-            ParamKind::Type(t) => {
-                // no array parameter
-                Ok(FixedArg::Elem(Elem::parse(cur, db, cache, t)?))
-            },
-            _ => unimplemented!()
-        }
+    fn parse<'d: 'db>(cur: &mut &'db [u8], db: &'db Database, kind: ElemKind<'d>) -> Result<FixedArg<'db>> {
+        Ok(match kind {
+            ElemKind::Elem(t) => FixedArg::Elem(t.parse_value(cur, db)?),
+            ElemKind::Array(t) => FixedArg::Array(unimplemented!())
+        })
     }
 }
 
@@ -678,7 +671,7 @@ pub struct NamedArg<'db> {
 }
 
 impl<'db> NamedArg<'db> {
-    fn parse<'c, 'd>(cur: &mut &'db [u8], db: &'db Database, cache: &'c crate::Cache<'d>) -> Result<NamedArg<'db>> {
+    fn parse<'c, 'd: 'db>(cur: &mut &'db [u8], db: &'db Database, cache: &'c crate::Cache<'d>) -> Result<NamedArg<'db>> {
         let is_property = match cur.read_u8()? {
             bits::ARG_FIELD => false,
             bits::ARG_PROPERTY => true,
@@ -687,38 +680,9 @@ impl<'db> NamedArg<'db> {
             }
         };
 
-        let (name, value) = match cur.read_u8()? {
-            bits::ARG_SYSTEM_TYPE => {
-                let name = read_string(cur)?.expect("NamedArg name must not be NULL");
-                let type_name = read_string(cur)?.expect("NamedArg type name must not be NULL");
-                (name, FixedArg::Elem(Elem::SystemType(type_name)))
-            },
-            bits::ARG_ENUM => {
-                let type_string = read_string(cur)?.expect("NamedArg enum type name must not be NULL");
-                let name = read_string(cur)?.expect("NamedArg type name must not be NULL");
-                let type_def = match type_string.resolve(cache) {
-                    None => return Err("CustomAttribute named param referenced unresolved enum type".into()),
-                    Some(t) => if !t.is_enum() { return Err("CustomAttribute named param referenced non-enum type".into()); } else { t }
-                };
-                unimplemented!()
-            },
-            _ => unimplemented!() // primitive or string, or array
-
-            // bits::ELEMENT_TYPE_SZARRAY => ...
-            // bits::ELEMENT_TYPE_BOOLEAN => Type::Primitive(PrimitiveType::Boolean),
-            // bits::ELEMENT_TYPE_CHAR => Type::Primitive(PrimitiveType::Char),
-            // bits::ELEMENT_TYPE_I1 => Type::Primitive(PrimitiveType::I1),
-            // bits::ELEMENT_TYPE_U1 => Type::Primitive(PrimitiveType::U1),
-            // bits::ELEMENT_TYPE_I2 => Type::Primitive(PrimitiveType::I2),
-            // bits::ELEMENT_TYPE_U2 => Type::Primitive(PrimitiveType::U2),
-            // bits::ELEMENT_TYPE_I4 => Type::Primitive(PrimitiveType::I4),
-            // bits::ELEMENT_TYPE_U4 => Type::Primitive(PrimitiveType::U4),
-            // bits::ELEMENT_TYPE_I8 => Type::Primitive(PrimitiveType::I8),
-            // bits::ELEMENT_TYPE_U8 => Type::Primitive(PrimitiveType::U8),
-            // bits::ELEMENT_TYPE_R4 => Type::Primitive(PrimitiveType::R4),
-            // bits::ELEMENT_TYPE_R8 => Type::Primitive(PrimitiveType::R8),
-            // bits::ELEMENT_TYPE_STRING => ...
-        };
+        let elem_kind = ElemKind::parse(cur, db, cache)?;
+        let name = read_string(cur)?.expect("NamedArg name must not be NULL");
+        let value = FixedArg::parse(cur, db, elem_kind)?;
 
         if is_property {
             Ok(NamedArg { name: NamedArgName::Property(name), value: value })
@@ -748,6 +712,102 @@ fn enum_get_underlying_type(typ: &super::TypeDef) -> Result<PrimitiveType> {
     Ok(result.expect("enum without underlying type"))
 }
 
+enum FieldOrPropType<'db> {
+    Primitive(PrimitiveType),
+    String,
+    SystemType,
+    Enum(super::TypeDef<'db>),
+}
+
+impl<'db> FieldOrPropType<'db> {
+    fn from_fixed_arg_type<'c, 'd: 'db>(typ: &Type<'db>, cache: &'c crate::Cache<'d>) -> Result<FieldOrPropType<'db>> {
+        Ok(match typ {
+            Type::Primitive(PrimitiveType::I) | Type::Primitive(PrimitiveType::U) => return Err("FieldOrPropType can not have type I or U".into()),
+            Type::Primitive(p) => FieldOrPropType::Primitive(*p),
+            Type::Ref(_, t, None) if t.namespace_name_pair() == ("System", "Type") => FieldOrPropType::SystemType,
+            Type::Ref(TypeTag::ValueType, t, None) => {
+                let resolved = t.resolve(cache).ok_or::<crate::DecodeError>("Unresolvable CustomAttribute param TypeDefOrRef".into())?;
+                if !resolved.is_enum() {
+                    return Err("CustomAttribute params that are TypeDefOrRef must be an enum or System.Type".into())
+                }
+                FieldOrPropType::Enum(resolved.clone())
+            },
+            Type::String => FieldOrPropType::String,
+            _ => {
+                unimplemented!() // TODO: System.Object (boxed value type) is also possible
+            }
+        })
+    }
+
+    fn parse<'c, 'd: 'db>(cur: &mut &'db [u8], db: &'db Database<'db>, cache: &'c crate::Cache<'d>) -> Result<FieldOrPropType<'db>> {
+        Ok(match cur.read_u8()? {
+            bits::ELEMENT_TYPE_BOOLEAN => FieldOrPropType::Primitive(PrimitiveType::Boolean),
+            bits::ELEMENT_TYPE_CHAR => FieldOrPropType::Primitive(PrimitiveType::Char),
+            bits::ELEMENT_TYPE_I1 => FieldOrPropType::Primitive(PrimitiveType::I1),
+            bits::ELEMENT_TYPE_U1 => FieldOrPropType::Primitive(PrimitiveType::U1),
+            bits::ELEMENT_TYPE_I2 => FieldOrPropType::Primitive(PrimitiveType::I2),
+            bits::ELEMENT_TYPE_U2 => FieldOrPropType::Primitive(PrimitiveType::U2),
+            bits::ELEMENT_TYPE_I4 => FieldOrPropType::Primitive(PrimitiveType::I4),
+            bits::ELEMENT_TYPE_U4 => FieldOrPropType::Primitive(PrimitiveType::U4),
+            bits::ELEMENT_TYPE_I8 => FieldOrPropType::Primitive(PrimitiveType::I8),
+            bits::ELEMENT_TYPE_U8 => FieldOrPropType::Primitive(PrimitiveType::U8),
+            bits::ELEMENT_TYPE_R4 => FieldOrPropType::Primitive(PrimitiveType::R4),
+            bits::ELEMENT_TYPE_R8 => FieldOrPropType::Primitive(PrimitiveType::R8),
+            bits::ELEMENT_TYPE_STRING => FieldOrPropType::String,
+            bits::ARG_SYSTEM_TYPE => FieldOrPropType::SystemType,
+            bits::ARG_ENUM => {
+                let type_string = read_string(cur)?.expect("NamedArg enum type name must not be NULL");
+                let name = read_string(cur)?.expect("NamedArg type name must not be NULL");
+                let type_def = match type_string.resolve(cache) {
+                    None => return Err("CustomAttribute named param referenced unresolved enum type".into()),
+                    Some(t) => if !t.is_enum() { return Err("CustomAttribute named param referenced non-enum type".into()); } else { t }
+                };
+                FieldOrPropType::Enum(type_def)
+            },
+            _ => return Err("unexpected FieldOrPropType".into())
+        })
+    }
+
+    fn parse_value(self, cur: &mut &'db [u8], db: &'db Database<'db>) -> Result<Elem<'db>> {
+        use FieldOrPropType::*;
+        Ok(match self {
+            Primitive(p) => Elem::Primitive(p.parse_value(cur)?),
+            String => Elem::String(read_string(cur)?),
+            SystemType => Elem::SystemType(read_string(cur)?.expect("NULL string in System.Type custom attribute value")),
+            Enum(t) => {
+                let underlying = enum_get_underlying_type(&t)?;
+                Elem::EnumValue(t, underlying.parse_value(cur)?)
+            }
+        })
+    }
+}
+
+enum ElemKind<'db> {
+    Elem(FieldOrPropType<'db>),
+    Array(FieldOrPropType<'db>)
+}
+
+impl<'db> ElemKind<'db> {
+    fn from_fixed_arg_type<'c, 'd: 'db>(typ: &Type<'db>, cache: &'c crate::Cache<'d>) -> Result<ElemKind<'db>> {
+        Ok(match typ {
+            Type::Array(_) => ElemKind::Array(unimplemented!()), // TODO: single-dimension array is allowed
+            _ => ElemKind::Elem(FieldOrPropType::from_fixed_arg_type(typ, cache)?)
+        })
+    }
+
+    fn parse<'c, 'd: 'db>(cur: &mut &'db [u8], db: &'db Database<'db>, cache: &'c crate::Cache<'d>) -> Result<ElemKind<'db>> {
+        let mut cur_clone = cur.clone(); // maybe we need to rewind
+        let element_type = cur.read_u8()?;
+        Ok(match element_type {
+            bits::ELEMENT_TYPE_SZARRAY => ElemKind::Array(FieldOrPropType::parse(cur, db, cache)?),
+            _ => {
+                mem::swap(cur, &mut cur_clone); // rewind cursor
+                ElemKind::Elem(FieldOrPropType::parse(cur, db, cache)?)
+            }
+        })
+    }
+}
+
 #[derive(Clone, Debug)]
 pub enum Elem<'db> {
     Primitive(super::PrimitiveValue),
@@ -755,32 +815,6 @@ pub enum Elem<'db> {
     SystemType(&'db str),
     EnumValue(super::TypeDef<'db>, super::PrimitiveValue)
 }
-
-impl<'db> Elem<'db> {
-    fn parse<'c, 'd: 'db>(cur: &mut &'db [u8], db: &'db Database, cache: &'c crate::Cache<'d>, typ: &Type<'db>) -> Result<Elem<'db>> {
-        //println!("Parsing Elem: {:?}", cur);
-        let r = Ok(match typ {
-            Type::Primitive(p) => {
-                Elem::Primitive(p.parse_value(cur)?)
-            },
-            Type::Ref(_, t, None) if t.namespace_name_pair() == ("System", "Type") => {
-                Elem::SystemType(read_string(cur)?.expect("NULL string in System.Type custom attribute value"))
-            },
-            Type::Ref(TypeTag::ValueType, t, None) => {
-                let resolved = t.resolve(cache).ok_or::<crate::DecodeError>("Unresolvable CustomAttribute param TypeDefOrRef".into())?;
-                if !resolved.is_enum() {
-                    return Err("CustomAttribute params that are TypeDefOrRef must be an enum or System.Type".into())
-                }
-                let underlying = enum_get_underlying_type(&resolved)?;
-                Elem::EnumValue(resolved.clone(), underlying.parse_value(cur)?)
-            },
-            _ => unimplemented!() // System.Object is also possible
-        });
-        //println!("{:?}", r);
-        r // FIXME: cleanup
-    }
-}
-
 
 impl<'db> CustomAttributeSig<'db> {
     pub(crate) fn parse<'c, 'd: 'db>(cur: &mut &'db [u8], db: &'db Database<'db>, cache: &'c crate::Cache<'d>, ctor: &MethodDefSig<'db>) -> Result<CustomAttributeSig<'db>> {
@@ -794,7 +828,13 @@ impl<'db> CustomAttributeSig<'db> {
         let mut fixed_args = Vec::with_capacity(ctor_params.len());
 
         for param in ctor_params {
-            fixed_args.push(FixedArg::parse(cur, db, cache, param)?);
+            let elem_kind = match param.kind() {
+                ParamKind::Type(t) => {
+                    ElemKind::from_fixed_arg_type(&t, cache)?
+                },
+                _ => return Err("unexpected parameter type for FixedArg".into())
+            };
+            fixed_args.push(FixedArg::parse(cur, db, elem_kind)?);
         }
 
         let named_args_count = cur.read_u16::<LittleEndian>()?;
