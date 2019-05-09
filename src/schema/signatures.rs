@@ -87,12 +87,13 @@ mod bits {
     pub const ELEMENT_TYPE_MODIFIER: u8 = 0x40;
     pub const ELEMENT_TYPE_SENTINEL: u8 = 0x41;
     pub const ELEMENT_TYPE_PINNED: u8 = 0x45;
-    // 0x50 (System.Type)
+
+    pub const ARG_SYSTEM_TYPE: u8 = 0x50; // System.Type in custom attributes
     // 0x51 (Boxed object in custom attributes)
     // 0x52 (Reserved)
-    // 0x53 (FIELD in custom attributes)
-    // 0x54 (PROPERTY in custom attributes)
-    // 0x55 (enum in custom attributes)
+    pub const ARG_FIELD: u8 = 0x53; // FIELD in custom attributes
+    pub const ARG_PROPERTY: u8 = 0x54; //PROPERTY in custom attributes
+    pub const ARG_ENUM: u8 = 0x55; // enum in custom attributes
 }
 
 // ECMA-335, II.23.2.1
@@ -642,7 +643,7 @@ impl<'db> CustomAttributeSig<'db> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum FixedArg<'db> {
     Elem(Elem<'db>),
     Array(Vec<Elem<'db>>)
@@ -664,15 +665,66 @@ impl<'db> FixedArg<'db> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
+pub enum NamedArgName<'db> {
+    Field(&'db str),
+    Property(&'db str)
+}
+
+#[derive(Debug, Clone)]
 pub struct NamedArg<'db> {
-    pub name: &'db str,
+    pub name: NamedArgName<'db>,
     pub value: FixedArg<'db>
 }
 
 impl<'db> NamedArg<'db> {
-    fn parse(cur: &mut &'db [u8], db: &'db Database) -> Result<NamedArg<'db>> {
-        unimplemented!()
+    fn parse<'c, 'd>(cur: &mut &'db [u8], db: &'db Database, cache: &'c crate::Cache<'d>) -> Result<NamedArg<'db>> {
+        let is_property = match cur.read_u8()? {
+            bits::ARG_FIELD => false,
+            bits::ARG_PROPERTY => true,
+            _ => {
+                return Err("NamedArg must be either FIELD or PROPERTY".into());
+            }
+        };
+
+        let (name, value) = match cur.read_u8()? {
+            bits::ARG_SYSTEM_TYPE => {
+                let name = read_string(cur)?.expect("NamedArg name must not be NULL");
+                let type_name = read_string(cur)?.expect("NamedArg type name must not be NULL");
+                (name, FixedArg::Elem(Elem::SystemType(type_name)))
+            },
+            bits::ARG_ENUM => {
+                let type_string = read_string(cur)?.expect("NamedArg enum type name must not be NULL");
+                let name = read_string(cur)?.expect("NamedArg type name must not be NULL");
+                let type_def = match type_string.resolve(cache) {
+                    None => return Err("CustomAttribute named param referenced unresolved enum type".into()),
+                    Some(t) => if !t.is_enum() { return Err("CustomAttribute named param referenced non-enum type".into()); } else { t }
+                };
+                unimplemented!()
+            },
+            _ => unimplemented!() // primitive or string, or array
+
+            // bits::ELEMENT_TYPE_SZARRAY => ...
+            // bits::ELEMENT_TYPE_BOOLEAN => Type::Primitive(PrimitiveType::Boolean),
+            // bits::ELEMENT_TYPE_CHAR => Type::Primitive(PrimitiveType::Char),
+            // bits::ELEMENT_TYPE_I1 => Type::Primitive(PrimitiveType::I1),
+            // bits::ELEMENT_TYPE_U1 => Type::Primitive(PrimitiveType::U1),
+            // bits::ELEMENT_TYPE_I2 => Type::Primitive(PrimitiveType::I2),
+            // bits::ELEMENT_TYPE_U2 => Type::Primitive(PrimitiveType::U2),
+            // bits::ELEMENT_TYPE_I4 => Type::Primitive(PrimitiveType::I4),
+            // bits::ELEMENT_TYPE_U4 => Type::Primitive(PrimitiveType::U4),
+            // bits::ELEMENT_TYPE_I8 => Type::Primitive(PrimitiveType::I8),
+            // bits::ELEMENT_TYPE_U8 => Type::Primitive(PrimitiveType::U8),
+            // bits::ELEMENT_TYPE_R4 => Type::Primitive(PrimitiveType::R4),
+            // bits::ELEMENT_TYPE_R8 => Type::Primitive(PrimitiveType::R8),
+            // bits::ELEMENT_TYPE_STRING => ...
+        };
+
+        if is_property {
+            Ok(NamedArg { name: NamedArgName::Property(name), value: value })
+        } else {
+            Ok(NamedArg { name: NamedArgName::Field(name), value: value })
+        }
     }
 }
 
@@ -722,10 +774,10 @@ impl<'db> Elem<'db> {
                 let underlying = enum_get_underlying_type(&resolved)?;
                 Elem::EnumValue(resolved.clone(), underlying.parse_value(cur)?)
             },
-            _ => unimplemented!()
+            _ => unimplemented!() // System.Object is also possible
         });
         //println!("{:?}", r);
-        r
+        r // FIXME: cleanup
     }
 }
 
@@ -749,7 +801,7 @@ impl<'db> CustomAttributeSig<'db> {
         let mut named_args = Vec::with_capacity(named_args_count as usize);
 
         for _ in 0.. named_args_count {
-            named_args.push(NamedArg::parse(cur, db)?);
+            named_args.push(NamedArg::parse(cur, db, cache)?);
         }
 
         Ok(CustomAttributeSig {
