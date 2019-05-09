@@ -12,6 +12,7 @@ use crate::schema;
 use crate::schema::marker;
 use crate::schema::signatures::*;
 use crate::schema::flags::*;
+use crate::schema::custom_attributes::CustomAttributeSig;
 
 macro_rules! row_type {
     ($ty:ident) => {

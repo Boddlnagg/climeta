@@ -10,6 +10,8 @@ mod rows;
 pub use rows::*;
 mod signatures;
 pub use signatures::*;
+mod custom_attributes;
+pub use custom_attributes::*;
 
 macro_rules! table_kind {
     ($ty:ident [$($colty:ty),+]) => {
