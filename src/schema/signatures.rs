@@ -1,11 +1,11 @@
 use std::fmt;
 use std::mem;
-use byteorder::ReadBytesExt;
+use byteorder::{ReadBytesExt, LittleEndian};
 use crate::Result;
 use crate::core::db::{Database, CodedIndex};
 use super::TypeDefOrRef;
 
-fn uncompress_unsigned(cursor: &mut &[u8]) -> Result<u32> {
+pub(crate) fn uncompress_unsigned(cursor: &mut &[u8]) -> Result<u32> {
     let first = cursor.read_u8()?;
     if (first & 0x80) == 0x00 {
         Ok(first as u32)
@@ -25,21 +25,23 @@ fn uncompress_unsigned(cursor: &mut &[u8]) -> Result<u32> {
 }
 
 #[allow(dead_code, unused_variables)]
-fn uncompress_signed(cursor: &mut &[u8]) -> Result<i32> {
+pub(crate) fn uncompress_signed(cursor: &mut &[u8]) -> Result<i32> {
     unimplemented!()
 }
 
 
 #[allow(non_upper_case_globals, dead_code)]
-mod bits {
+pub(crate) mod bits {
     pub const CallingConvention_mask: u8 = 0x15; // 10101
-    pub const DEFAULT: u8 = 0x00;
-    pub const VARARG: u8 = 0x05;
-    pub const FIELD: u8 = 0x06;
-    pub const GENERIC: u8 = 0x10;
+    pub const DEFAULT: u8 = 0x00; // II.23.2.1
+    pub const VARARG: u8 = 0x05; // II.23.2.1
+    pub const FIELD: u8 = 0x06; // II.23.2.4
+    pub const PROPERTY: u8 = 0x08; // II.23.2.5
+    //pub const PROPERTY: u8 = 0x28; // what about this one? (II.23.2.5)
+    pub const GENERIC: u8 = 0x10; // II.23.2.1
 
-    pub const HASTHIS: u8 = 0x20;
-    pub const EXPLICITTHIS: u8 = 0x40;
+    pub const HASTHIS: u8 = 0x20; // II.23.2.1
+    pub const EXPLICITTHIS: u8 = 0x40; // II.23.2.1
 
     pub const ELEMENT_TYPE_END: u8 = 0x00;
     pub const ELEMENT_TYPE_VOID: u8 = 0x01;
@@ -76,15 +78,17 @@ mod bits {
     pub const ELEMENT_TYPE_MODIFIER: u8 = 0x40;
     pub const ELEMENT_TYPE_SENTINEL: u8 = 0x41;
     pub const ELEMENT_TYPE_PINNED: u8 = 0x45;
-    // 0x50 (System.Type)
+
+    pub const ARG_SYSTEM_TYPE: u8 = 0x50; // System.Type in custom attributes
     // 0x51 (Boxed object in custom attributes)
     // 0x52 (Reserved)
-    // 0x53 (FIELD in custom attributes)
-    // 0x54 (PROPERTY in custom attributes)
-    // 0x55 (enum in custom attributes)
+    pub const ARG_FIELD: u8 = 0x53; // FIELD in custom attributes
+    pub const ARG_PROPERTY: u8 = 0x54; //PROPERTY in custom attributes
+    pub const ARG_ENUM: u8 = 0x55; // enum in custom attributes
 }
 
 // ECMA-335, II.23.2.1
+#[derive(Clone)]
 pub struct MethodDefSig<'db> {
     m_initial_byte: u8,
     m_generic_param_count: u32,
@@ -93,8 +97,9 @@ pub struct MethodDefSig<'db> {
 }
 
 impl<'db> MethodDefSig<'db> {
-    pub(crate) fn parse(cur: &mut &'db [u8], db: &'db Database) -> Result<MethodDefSig<'db>> {
+    pub(crate) fn parse(cur: &mut &'db [u8], db: &'db Database<'db>) -> Result<MethodDefSig<'db>> {
         let initial_byte = cur.read_u8()?;
+        assert!(initial_byte & bits::FIELD == 0 && initial_byte & bits::PROPERTY == 0);
         let generic_param_count = if initial_byte & bits::GENERIC != 0 {
             uncompress_unsigned(cur)?
         } else {
@@ -150,8 +155,39 @@ impl<'db> MethodDefSig<'db> {
 
 // TODO: impl Debug for MethodDefSig (s.a. II.15.3)
 
+
+// ECMA-335, II.23.2.4
+pub struct FieldSig<'db> {
+    m_type: Type<'db>,
+    m_cmod: Vec<CustomMod<'db>>,
+}
+
+impl<'db> FieldSig<'db> {
+    pub(crate) fn parse(cur: &mut &'db [u8], db: &'db Database) -> Result<FieldSig<'db>> {
+        let call_conv = uncompress_unsigned(cur)?;
+        if call_conv != bits::FIELD as u32 { return Err("FieldSig blob requires FIELD".into()); }
+
+        let cmod = CustomMod::parse(cur, db)?;
+        let typ = Type::parse(cur, db)?;
+
+        Ok(FieldSig {
+            m_type: typ,
+            m_cmod: cmod
+        })
+    }
+
+    pub fn type_(&self) -> &Type<'db> {
+        &self.m_type
+    }
+
+    pub fn custom_mod(&self) -> &[CustomMod<'db>] {
+        &self.m_cmod[..]
+    }
+}
+
 // TODO: this could also internally be Box<(Type, [CustomMod])>,
 //       where the tuple is dynamically sized, to have only one dynamic allocation
+#[derive(Clone)]
 pub struct Array<'db> {
     m_type: Box<Type<'db>>,
     m_cmod: Vec<CustomMod<'db>>
@@ -201,13 +237,13 @@ impl<'db> fmt::Debug for TypeTag {
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq, Eq)]
 pub enum GenericVarScope {
     Type,
     Method
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq, Eq)]
 pub enum PrimitiveType {
     Boolean,
     Char,
@@ -223,6 +259,27 @@ pub enum PrimitiveType {
     R8,
     I,
     U,
+}
+
+impl PrimitiveType {
+    pub(crate) fn parse_value<'db>(&self, cur: &mut &'db [u8]) -> Result<super::PrimitiveValue> {
+        use super::PrimitiveValue::*;
+        Ok(match self {
+            PrimitiveType::Boolean => Boolean(cur.read_u8()? != 0),
+            PrimitiveType::Char => Char(cur.read_u16::<LittleEndian>()?),
+            PrimitiveType::I1 => Int8(cur.read_i8()?),
+            PrimitiveType::U1 => UInt8(cur.read_u8()?),
+            PrimitiveType::I2 => Int16(cur.read_i16::<LittleEndian>()?),
+            PrimitiveType::U2 => UInt16(cur.read_u16::<LittleEndian>()?),
+            PrimitiveType::I4 => Int32(cur.read_i32::<LittleEndian>()?),
+            PrimitiveType::U4 => UInt32(cur.read_u32::<LittleEndian>()?),
+            PrimitiveType::I8 => Int64(cur.read_i64::<LittleEndian>()?),
+            PrimitiveType::U8 => UInt64(cur.read_u64::<LittleEndian>()?),
+            PrimitiveType::R4 => Float32(cur.read_f32::<LittleEndian>()?),
+            PrimitiveType::R8 => Float64(cur.read_f64::<LittleEndian>()?),
+            PrimitiveType::I | PrimitiveType::U => return Err("Primitive value of type I or U not supported".into())
+        })
+    }
 }
 
 impl fmt::Debug for PrimitiveType {
@@ -249,6 +306,7 @@ impl fmt::Debug for PrimitiveType {
 }
 
 // ECMA-335, II.23.2.12
+#[derive(Clone)]
 pub enum Type<'db> {
     Primitive(PrimitiveType),
     Array(Array<'db>), // for ARRAY and SZARRAY
@@ -354,6 +412,7 @@ impl<'db> fmt::Debug for Type<'db> {
     }
 }
 
+#[derive(Clone)]
 pub enum RetTypeKind<'db> {
     Void,
     Type(Type<'db>),
@@ -376,6 +435,7 @@ impl<'db> fmt::Debug for RetTypeKind<'db> {
 }
 
 // ECMA-335, II.23.2.11
+#[derive(Clone)]
 pub struct RetType<'db> {
     m_cmod: Vec<CustomMod<'db>>,
     m_kind: RetTypeKind<'db>,
@@ -412,6 +472,7 @@ impl<'db> RetType<'db> {
     }
 }
 
+#[derive(Clone)]
 pub enum ParamKind<'db> {
     Type(Type<'db>),
     TypeByRef(Type<'db>),
@@ -432,6 +493,7 @@ impl<'db> fmt::Debug for ParamKind<'db> {
 }
 
 // ECMA-335, II.23.2.10 (renamed to prevent name conflict with Param table row)
+#[derive(Clone)]
 pub struct ParamSig<'db> {
     m_cmod: Vec<CustomMod<'db>>,
     m_kind: ParamKind<'db>,
@@ -474,6 +536,7 @@ pub enum CustomModTag {
 }
 
 // ECMA-335, II.23.2.7
+#[derive(Clone)]
 pub struct CustomMod<'db> {
     m_tag: CustomModTag,
     m_type: TypeDefOrRef<'db>

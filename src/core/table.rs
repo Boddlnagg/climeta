@@ -111,7 +111,7 @@ impl<'db, T: TableKind> IntoIterator for Table<'db, T>
 
 #[derive(Clone)]
 pub(crate) struct Row<'db, T: TableKind> {
-    m_table: Table<'db, T>,
+    pub(crate) m_table: Table<'db, T>,
     m_row: u32,
 }
 
@@ -177,10 +177,6 @@ impl<'db, T: TableKind> Row<'db, T> where &'db T: TableRowAccess<Table=Table<'db
         self.m_row
     }
 
-    pub(crate) fn get_db(&self) -> &'db Database {
-        self.m_table.db
-    }
-
     pub(crate) fn get_value<Col: ColumnIndex, V>(&self) -> Result<V>
         where T: ColumnAccess<Col>, V: ReadValue<T::ColumnSize>
     {
@@ -193,10 +189,15 @@ impl<'db, T: TableKind> Row<'db, T> where &'db T: TableRowAccess<Table=Table<'db
         self.m_table.db.get_string(self.get_value::<Col, _>()?)
     }
 
-    pub(crate) fn get_blob<Col: ColumnIndex>(&self) -> Result<&'db [u8]>
+    pub(crate) fn get_blob<Col: ColumnIndex>(&self) -> Result<Option<&'db [u8]>>
         where T: ColumnAccess<Col>, u32: ReadValue<T::ColumnSize>
     {
-        self.m_table.db.get_blob(self.get_value::<Col, _>()?)
+        let value = self.get_value::<Col, _>()?;
+        Ok(if value == 0 {
+            None
+        } else {
+            Some(self.m_table.db.get_blob(value)?)
+        })
     }
 
     pub(crate) fn get_coded_index<Col: ColumnIndex, Target: db::CodedIndex<Database=&'db Database<'db>>>(&self) -> Result<Option<Target>>
