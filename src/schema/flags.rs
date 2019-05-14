@@ -24,7 +24,7 @@ pub use type_attributes::*;
 
 #[repr(u32)]
 #[derive(FromPrimitive, ToPrimitive)]
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum MemberAccess {
     CompilerControlled = 0x0000, // Member not referenceable
     Private = 0x0001,

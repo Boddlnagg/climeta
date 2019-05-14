@@ -14,7 +14,7 @@ fn read_string<'db>(cursor: &mut &'db [u8]) -> Result<Option<&'db str>> {
 }
 
 // ECMA-335, II.23.3 (renamed to prevent name conflict with CustomAttribute table row)
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct CustomAttributeSig<'db> {
     m_fixed: Vec<FixedArg<'db>>,
     m_named: Vec<NamedArg<'db>>,
@@ -78,7 +78,7 @@ impl<'db> FixedArg<'db> {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NamedArgName<'db> {
     Field(&'db str),
     Property(&'db str)
@@ -132,6 +132,7 @@ fn enum_get_underlying_type(typ: &super::TypeDef) -> Result<PrimitiveType> {
     Ok(result.expect("enum without underlying type"))
 }
 
+#[derive(Clone, Debug)]
 enum FieldOrPropType<'db> {
     Primitive(PrimitiveType),
     String,
@@ -201,6 +202,7 @@ impl<'db> FieldOrPropType<'db> {
     }
 }
 
+#[derive(Clone, Debug)]
 enum ElemKind<'db> {
     Elem(FieldOrPropType<'db>),
     Array(FieldOrPropType<'db>)

@@ -157,6 +157,7 @@ impl<'db> MethodDefSig<'db> {
 
 
 // ECMA-335, II.23.2.4
+#[derive(Clone)]
 pub struct FieldSig<'db> {
     m_type: Type<'db>,
     m_cmod: Vec<CustomMod<'db>>,
@@ -222,7 +223,7 @@ impl<'db> fmt::Debug for Array<'db> {
 }
 
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, PartialEq, Eq)]
 pub enum TypeTag {
     Class,
     ValueType
@@ -529,7 +530,7 @@ impl<'db> ParamSig<'db> {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum CustomModTag {
     Optional,
     Required
@@ -576,6 +577,7 @@ impl<'db> CustomMod<'db> {
 }
 
 // ECMA-335, II.23.2.14 (renamed to prevent name clash with TypeSpec table row)
+#[derive(Clone)]
 pub enum TypeSpecSig<'db> {
     GenericInst(TypeTag, TypeDefOrRef<'db>, Box<[Type<'db>]>)
 }
