@@ -36,7 +36,7 @@ macro_rules! impl_tableinfo_access {
 
         impl<'db> TableInfoAccess<'db, schema::marker::$tab> for Database<'db> {
             fn get_table_info(&self) -> &TableInfo<'db, schema::marker::$tab> {
-                &self.m_tables.$tab
+                &self.tables.$tab
             }
         }
     }
@@ -153,10 +153,10 @@ pub(crate) trait CodedIndexEncode<T: TableKind>: CodedIndex {
 }
 
 pub(crate) struct Database<'db> {
-    m_strings: &'db [u8],
-    m_blobs: &'db [u8],
-    m_guids: &'db [u8],
-    m_tables: Tables<'db>
+    strings: &'db [u8],
+    blobs: &'db [u8],
+    _guids: &'db [u8],
+    tables: Tables<'db>
 }
 
 pub fn is_database<P: AsRef<Path>>(path: P) -> io::Result<bool> {
@@ -232,31 +232,31 @@ fn stream_offset(name: &[u8]) -> usize {
 impl<'db> Database<'db> {
     pub fn load(data: &'db [u8]) -> Result<Database<'db>> {
 
-        let m_view = data;
+        let view = data;
 
-        if m_view.len() < mem::size_of::<pe::image_dos_header>() {
+        if view.len() < mem::size_of::<pe::image_dos_header>() {
             return Err("Unexpected end of file".into());
         }
         
-        let dos = unsafe { m_view.view_as::<pe::image_dos_header>(0) };
+        let dos = unsafe { view.view_as::<pe::image_dos_header>(0) };
 
         if dos.e_magic != 0x5A4D { // IMAGE_DOS_SIGNATURE
             return Err("Invalid DOS signature".into());
         }
 
-        if m_view.len() < (dos.e_lfanew as usize + mem::size_of::<pe::image_nt_headers32>()) {
+        if view.len() < (dos.e_lfanew as usize + mem::size_of::<pe::image_nt_headers32>()) {
             return Err("Unexpected end of file".into());
         }
 
-        let pe = unsafe { m_view.view_as::<pe::image_nt_headers32>(dos.e_lfanew as usize) };
+        let pe = unsafe { view.view_as::<pe::image_nt_headers32>(dos.e_lfanew as usize) };
 
         if pe.FileHeader.NumberOfSections == 0 || pe.FileHeader.NumberOfSections > 100 {
             return Err("Invalid PE section count".into());
         }
 
         let com = &pe.OptionalHeader.DataDirectory[14]; // IMAGE_DIRECTORY_ENTRY_COM_DESCRIPTOR
-        let sections = unsafe { m_view.view_as_slice::<pe::image_section_header>(dos.e_lfanew as usize + mem::size_of::<pe::image_nt_headers32>(),
-                                                                                pe.FileHeader.NumberOfSections as usize) };
+        let sections = unsafe { view.view_as_slice::<pe::image_section_header>(dos.e_lfanew as usize + mem::size_of::<pe::image_nt_headers32>(),
+                                                                               pe.FileHeader.NumberOfSections as usize) };
         let section = match pe::section_from_rva(sections, com.VirtualAddress) {
             None => return Err("PE section containing CLI header not found".into()),
             Some(s) => s
@@ -264,7 +264,7 @@ impl<'db> Database<'db> {
 
         let offset = pe::offset_from_rva(section, com.VirtualAddress);
 
-        let cli = unsafe { m_view.view_as::<pe::image_cor20_header>(offset) };
+        let cli = unsafe { view.view_as::<pe::image_cor20_header>(offset) };
 
         if cli.cb as usize != mem::size_of::<pe::image_cor20_header>() {
             return Err("Invalid CLI header".into());
@@ -277,18 +277,18 @@ impl<'db> Database<'db> {
 
         let offset = pe::offset_from_rva(section, cli.MetaData.VirtualAddress);
 
-        if *unsafe { m_view.view_as::<u32>(offset)} != 0x424a5342 {
+        if *unsafe { view.view_as::<u32>(offset)} != 0x424a5342 {
             return Err("CLI metadata magic signature not found".into());
         }
 
-        let version_length = *unsafe { m_view.view_as::<u32>(offset + 12) } as usize;
-        let stream_count = *unsafe {m_view.view_as::<u16>(offset + version_length + 18) };
-        let mut view = &m_view[offset + version_length + 20..];
+        let version_length = *unsafe { view.view_as::<u32>(offset + 12) } as usize;
+        let stream_count = *unsafe {view.view_as::<u16>(offset + version_length + 18) };
+        let mut view = &view[offset + version_length + 20..];
         let mut tables: Option<_> = None;
 
-        let mut m_strings: Option<_> = None;
-        let mut m_blobs: Option<_> = None;
-        let mut m_guids: Option<_> = None;
+        let mut strings: Option<_> = None;
+        let mut blobs: Option<_> = None;
+        let mut guids: Option<_> = None;
 
         for _ in 0..stream_count {
             let stream = unsafe { view.view_as::<stream_range>(0) };
@@ -296,16 +296,16 @@ impl<'db> Database<'db> {
 
             match name {
                 b"#Strings" => {
-                    m_strings = Some(m_view.sub(offset + stream.offset as usize, stream.size as usize))
+                    strings = Some(view.sub(offset + stream.offset as usize, stream.size as usize))
                 },
                 b"#Blob" => {
-                    m_blobs = Some(m_view.sub(offset + stream.offset as usize, stream.size as usize))
+                    blobs = Some(view.sub(offset + stream.offset as usize, stream.size as usize))
                 },
                 b"#GUID" => {
-                    m_guids = Some(m_view.sub(offset + stream.offset as usize, stream.size as usize))
+                    guids = Some(view.sub(offset + stream.offset as usize, stream.size as usize))
                 },
                 b"#~" => {
-                    tables = Some(m_view.sub(offset + stream.offset as usize, stream.size as usize))
+                    tables = Some(view.sub(offset + stream.offset as usize, stream.size as usize))
                 },
                 _ => {
                     if name != b"#US" {
@@ -317,15 +317,15 @@ impl<'db> Database<'db> {
             view = &view[stream_offset(name)..];
         }
 
-        let m_strings = match m_strings {
+        let strings = match strings {
             Some(v) => v,
             None => return Err("Missing Strings stream".into())
         };
-        let m_blobs = match m_blobs {
+        let blobs = match blobs {
             Some(v) => v,
             None => return Err("Missing Blob stream".into())
         };
-        let m_guids = match m_guids {
+        let guids = match guids {
             Some(v) => v,
             None => return Err("Missing GUID stream".into())
         };
@@ -480,10 +480,10 @@ impl<'db> Database<'db> {
         t.GenericParamConstraint.set_data(view);
 
         Ok(Database {
-            m_strings,
-            m_blobs,
-            m_guids,
-            m_tables: t
+            strings: strings,
+            blobs: blobs,
+            _guids: guids,
+            tables: t
         })
     }
 
@@ -501,7 +501,7 @@ impl<'db> Database<'db> {
     }
 
     pub(crate) fn get_string(&self, index: u32) -> Result<&str> {
-        let view = &self.m_strings[index as usize..];
+        let view = &self.strings[index as usize..];
         let len = match view.iter().position(|b| *b == b'\0') {
             Some(p) => p,
             None => return Err("Missing string terminator".into())
@@ -511,7 +511,7 @@ impl<'db> Database<'db> {
     }
 
     pub(crate) fn get_blob(&self, index: u32) -> Result<&[u8]> {
-        let view = &self.m_blobs[index as usize..];
+        let view = &self.blobs[index as usize..];
         let mut initial_byte: u8 = view[0];
         let blob_size_bytes: usize = match initial_byte >> 5 {
             0 | 1 | 2 | 3 => {
