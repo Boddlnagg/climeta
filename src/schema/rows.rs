@@ -386,6 +386,10 @@ impl<'db> MethodSpec<'db> {
 
 // ECMA-335, II.22.30
 impl<'db> Module<'db> {
+    pub fn name(&self) -> Result<&'db str> {
+        self.0.get_string::<Col1>()
+    }
+
     pub fn custom_attributes(&self) -> Result<TableRowIterator<'db, marker::CustomAttribute>> {
         self.0.get_list_by_key::<marker::CustomAttribute>(super::HasCustomAttribute::encode(self))
     }
