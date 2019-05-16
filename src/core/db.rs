@@ -131,7 +131,7 @@ impl<'db> Tables<'db> {
     }
 }
 
-pub(crate) trait CodedIndex : Sized {
+pub(crate) trait CodedIndex: Sized {
     type Database;
     type Tables;
     const TAG_BITS: u8;
@@ -206,7 +206,7 @@ pub fn is_database<P: AsRef<Path>>(path: P) -> io::Result<bool> {
 
     let offset = pe::offset_from_rva(section, cli.MetaData.VirtualAddress);
 
-    if *unsafe { mmap.view_as::<u32>(offset)} != 0x424a5342 {
+    if *unsafe { mmap.view_as::<u32>(offset) } != 0x424a5342 {
         return Ok(false);
     }
 
@@ -277,12 +277,12 @@ impl<'db> Database<'db> {
 
         let offset = pe::offset_from_rva(section, cli.MetaData.VirtualAddress);
 
-        if *unsafe { view.view_as::<u32>(offset)} != 0x424a5342 {
+        if *unsafe { view.view_as::<u32>(offset) } != 0x424a5342 {
             return Err("CLI metadata magic signature not found".into());
         }
 
         let version_length = *unsafe { view.view_as::<u32>(offset + 12) } as usize;
-        let stream_count = *unsafe {view.view_as::<u16>(offset + version_length + 18) };
+        let stream_count = *unsafe { view.view_as::<u16>(offset + version_length + 18) };
         let mut remaining = &view[offset + version_length + 20..];
         let mut tables: Option<_> = None;
 
@@ -344,14 +344,12 @@ impl<'db> Database<'db> {
 
         let mut t = Tables::default();
 
-        for i in 0..64
-        {
-            if valid_bits >> i & 1 == 0
-            {
+        for i in 0..64 {
+            if valid_bits >> i & 1 == 0 {
                 continue;
             }
 
-            let row_count = *unsafe {view.view_as::<u32>(0) };
+            let row_count = *unsafe { view.view_as::<u32>(0) };
             view = &view[4..];
 
             match i {
