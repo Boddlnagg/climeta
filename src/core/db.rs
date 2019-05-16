@@ -283,7 +283,7 @@ impl<'db> Database<'db> {
 
         let version_length = *unsafe { view.view_as::<u32>(offset + 12) } as usize;
         let stream_count = *unsafe {view.view_as::<u16>(offset + version_length + 18) };
-        let mut view = &view[offset + version_length + 20..];
+        let mut remaining = &view[offset + version_length + 20..];
         let mut tables: Option<_> = None;
 
         let mut strings: Option<_> = None;
@@ -291,8 +291,8 @@ impl<'db> Database<'db> {
         let mut guids: Option<_> = None;
 
         for _ in 0..stream_count {
-            let stream = unsafe { view.view_as::<stream_range>(0) };
-            let name = view.as_c_str(8);
+            let stream = unsafe { remaining.view_as::<stream_range>(0) };
+            let name = remaining.as_c_str(8);
 
             match name {
                 b"#Strings" => {
@@ -314,7 +314,7 @@ impl<'db> Database<'db> {
                 }
             }
 
-            view = &view[stream_offset(name)..];
+            remaining = &remaining[stream_offset(name)..];
         }
 
         let strings = match strings {
