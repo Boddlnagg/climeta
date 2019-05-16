@@ -1,4 +1,4 @@
-# climeta
+# climeta [![crates.io](https://img.shields.io/crates/v/climeta.svg)](https://crates.io/crates/climeta) [![Build Status](https://dev.azure.com/Boddlnagg/climeta/_apis/build/status/Boddlnagg.climeta?branchName=master)](https://dev.azure.com/Boddlnagg/climeta/_build/latest?definitionId=1)
 ECMA-335 CLI metadata reader library for Rust.
 
 Based in part on the `meta_reader` implementation of https://github.com/Microsoft/xlang (C++).
