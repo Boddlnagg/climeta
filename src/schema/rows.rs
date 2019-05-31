@@ -25,6 +25,17 @@ macro_rules! row_type {
                 self.0.get_index()
             }
         }
+
+        
+        impl<'db> crate::AssemblyInfo for $ty<'db> {
+            fn get_assembly(&self) -> Option<schema::Assembly> {
+                self.0.m_table.db.get_assembly()
+            }
+
+            fn assembly_name(&self) -> Option<&str> {
+                self.0.m_table.db.assembly_name()
+            }
+        }
     }
 }
 
@@ -69,6 +80,18 @@ row_type!(TypeSpec);
 
 // ECMA-335, II.22.2
 impl<'db> Assembly<'db> {
+    pub fn public_key(&self) -> Result<Option<&'db [u8]>> {
+        self.0.get_blob::<Col3>()
+    }
+
+    pub fn name(&self) -> Result<&'db str> {
+        self.0.get_string::<Col4>()
+    }
+
+    pub fn culture(&self) -> Result<&'db str> {
+        self.0.get_string::<Col5>()
+    }
+
     pub fn custom_attributes(&self) -> Result<TableRowIterator<'db, marker::CustomAttribute>> {
         self.0.get_list_by_key::<marker::CustomAttribute>(super::HasCustomAttribute::encode(self))
     }
@@ -229,6 +252,10 @@ impl<'db> Field<'db> {
 
     pub fn signature(&self) -> Result<FieldSig<'db>> {
         FieldSig::parse(&mut self.0.get_blob::<Col2>()?.expect("Field signature blob was NULL"), self.0.m_table.db)
+    }
+
+    pub fn constant(&self) -> Result<Option<Constant<'db>>> {
+        self.0.get_single_by_key::<marker::Constant>(super::HasConstant::encode(self))
     }
 
     pub fn custom_attributes(&self) -> Result<TableRowIterator<'db, marker::CustomAttribute>> {
@@ -499,6 +526,26 @@ impl<'db> TypeDef<'db> {
             Ok(None) => false,
             Ok(Some(t)) => t.namespace_name_pair() == ("System", "Enum")
         }
+    }
+
+    pub fn enum_get_underlying_type(&self) -> Result<PrimitiveType> {
+        use PrimitiveType::*;
+
+        assert!(self.is_enum());
+        let mut result = None;
+        for field in self.field_list()? {
+            let flags = field.flags()?;
+            if !flags.literal() && !flags.static_() {
+                debug_assert!(result.is_none());
+                let typ = match field.signature()?.type_() {
+                    Type::Primitive(p) => *p,
+                    _ => return Err("enum underlying type must be primitive".into())
+                };
+                assert!(match typ { Boolean | Char | I1 | U1 | I2 | U2 | I4 | U4 | I8 | U8 => true, _ => false });
+                result = Some(typ);
+            }
+        }
+        Ok(result.expect("enum without underlying type"))
     }
 
     pub fn is_interface(&self) -> bool {

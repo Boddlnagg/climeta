@@ -209,6 +209,21 @@ impl<'db> Database<'db> {
     }
 }
 
+pub trait AssemblyInfo {
+    fn get_assembly(&self) -> Option<schema::Assembly>;
+    fn assembly_name(&self) -> Option<&str>;
+}
+
+impl<'db> AssemblyInfo for Database<'db> {
+    fn get_assembly(&self) -> Option<schema::Assembly> {
+        self.0.get_assembly()
+    }
+
+    fn assembly_name(&self) -> Option<&str> {
+        self.0.assembly_name()
+    }
+}
+
 pub trait TableRow {
     type Kind: db::TableKind;
     fn get_index(&self) -> u32;

@@ -156,7 +156,8 @@ pub(crate) struct Database<'db> {
     strings: &'db [u8],
     blobs: &'db [u8],
     _guids: &'db [u8],
-    tables: Tables<'db>
+    tables: Tables<'db>,
+    asm_name: Option<&'db str>,
 }
 
 pub fn is_database<P: AsRef<Path>>(path: P) -> io::Result<bool> {
@@ -228,6 +229,16 @@ fn stream_offset(name: &[u8]) -> usize {
 
     (8 + name.len() + padding)
 }
+
+fn read_string(strings: &[u8], index: u32) -> Result<&str> {
+        let view = &strings[index as usize..];
+        let len = match view.iter().position(|b| *b == b'\0') {
+            Some(p) => p,
+            None => return Err("Missing string terminator".into())
+        };
+
+        std::str::from_utf8(&view[..len]).map_err(|_| "Invalid UTF8 in string heap".into())
+    }
 
 impl<'db> Database<'db> {
     pub fn load(data: &'db [u8]) -> Result<Database<'db>> {
@@ -477,11 +488,19 @@ impl<'db> Database<'db> {
         view = t.MethodSpec.set_data(view);
         t.GenericParamConstraint.set_data(view);
 
+        let asm_name =
+            if t.Assembly.len() > 0 {
+                t.Assembly.get_value::<crate::core::columns::Col4, u32>(0).and_then(|idx| read_string(strings, idx)).ok()
+            } else {
+                None
+            };
+
         Ok(Database {
             strings: strings,
             blobs: blobs,
             _guids: guids,
-            tables: t
+            tables: t,
+            asm_name: asm_name
         })
     }
 
@@ -499,13 +518,7 @@ impl<'db> Database<'db> {
     }
 
     pub(crate) fn get_string(&self, index: u32) -> Result<&str> {
-        let view = &self.strings[index as usize..];
-        let len = match view.iter().position(|b| *b == b'\0') {
-            Some(p) => p,
-            None => return Err("Missing string terminator".into())
-        };
-
-        std::str::from_utf8(&view[..len]).map_err(|_| "Invalid UTF8 in string heap".into())
+        read_string(self.strings, index)
     }
 
     pub(crate) fn get_blob(&self, index: u32) -> Result<&[u8]> {
@@ -534,5 +547,23 @@ impl<'db> Database<'db> {
         }
 
         Ok(view.sub(blob_size_bytes, blob_size))
+    }
+}
+
+impl<'db> crate::AssemblyInfo for Database<'db> {
+    fn get_assembly(&self) -> Option<schema::Assembly> {
+        let table = self.get_table::<schema::Assembly>();
+        if table.len() > 0 {
+            match table.get_row(0) {
+                Ok(row) => Some(row),
+                Err(_) => None
+            }
+        } else {
+            None
+        }
+    }
+
+    fn assembly_name(&self) -> Option<&str> {
+        self.asm_name
     }
 }

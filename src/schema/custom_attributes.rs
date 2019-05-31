@@ -112,26 +112,6 @@ impl<'db> NamedArg<'db> {
     }
 }
 
-fn enum_get_underlying_type(typ: &super::TypeDef) -> Result<PrimitiveType> {
-    use PrimitiveType::*;
-
-    debug_assert!(typ.is_enum());
-    let mut result = None;
-    for field in typ.field_list()? {
-        let flags = field.flags()?;
-        if !flags.literal() && !flags.static_() {
-            debug_assert!(result.is_none());
-            let typ = match field.signature()?.type_() {
-                Type::Primitive(p) => *p,
-                _ => return Err("enum underlying type must be primitive".into())
-            };
-            assert!(match typ { Boolean | Char | I1 | U1 | I2 | U2 | I4 | U4 | I8 | U8 => true, _ => false });
-            result = Some(typ);
-        }
-    }
-    Ok(result.expect("enum without underlying type"))
-}
-
 #[derive(Clone, Debug)]
 enum FieldOrPropType<'db> {
     Primitive(PrimitiveType),
@@ -195,7 +175,7 @@ impl<'db> FieldOrPropType<'db> {
             String => Elem::String(read_string(cur)?),
             SystemType => Elem::SystemType(read_string(cur)?.expect("NULL string in System.Type custom attribute value")),
             Enum(t) => {
-                let underlying = enum_get_underlying_type(&t)?;
+                let underlying = t.enum_get_underlying_type()?;
                 Elem::EnumValue(t, underlying.parse_value(cur)?)
             }
         })

@@ -40,6 +40,23 @@ impl<'db, T> TableInfo<'db, T> {
             view
         }
     }
+
+    pub(crate) fn get_value<Col: ColumnIndex, V>(&self, row: u32) -> Result<V>
+        where T: ColumnAccess<Col>, V: ReadValue<T::ColumnSize>
+    {
+        let data_size = self.m_columns[Col::idx()].size;
+
+        if row > self.len() {
+            return Err("Invalid row index".into());
+        }
+        let input = &self.m_data.unwrap()[row as usize * self.m_row_size as usize +
+                                                self.m_columns[Col::idx()].offset as usize ..];
+        Ok(V::read_value(input, data_size))
+    }
+
+    pub(crate) fn len(&self) -> u32 {
+        self.m_row_count
+    }
 }
 
 impl<'db, T> Default for TableInfo<'db, T> {
@@ -75,14 +92,7 @@ impl<'db, T: TableKind> Table<'db, T> where &'db T: TableRowAccess<Table=Self> {
     pub(crate) fn get_value<Col: ColumnIndex, V>(&self, row: u32) -> Result<V>
         where T: ColumnAccess<Col>, V: ReadValue<T::ColumnSize>
     {
-        let data_size = self.table.m_columns[Col::idx()].size;
-
-        if row > self.len() {
-            return Err("Invalid row index".into());
-        }
-        let input = &self.table.m_data.unwrap()[row as usize * self.table.m_row_size as usize +
-                                                self.table.m_columns[Col::idx()].offset as usize ..];
-        Ok(V::read_value(input, data_size))
+        self.table.get_value(row)
     }
 
     pub fn get_row(&self, row: u32) -> Result<<&'db T as TableRowAccess>::Out> {
@@ -262,5 +272,25 @@ impl<'db, T: TableKind> Row<'db, T> where &'db T: TableRowAccess<Table=Table<'db
             m_row: begin as u32,
             m_end: end as u32
         })
+    }
+
+    pub(crate) fn get_single_by_key<Target: TableDescWithKey>(&self, encoded_idx: u32) -> Result<Option<<&'db Target as TableRowAccess>::Out>>
+        where db::Database<'db>: db::TableInfoAccess<'db, Target>,
+              Target::Columns: crate::core::columns::ColumnTupleAccess<Target::KeyColumn>,
+              u32: ReadValue<<Target::Columns as crate::core::columns::ColumnTupleAccess<Target::KeyColumn>>::Out>,
+              &'db Target: TableRowAccess<Table=Table<'db, Target>>,
+              <&'db Target as TableRowAccess>::Out: TableRow<Kind=Target>
+    {
+        let target_table = self.m_table.db.get_table::<<&'db Target as TableRowAccess>::Out>();
+        let (begin, end) = crate::core::equal_range_with(0, target_table.len() as usize, |i| {
+                                target_table.get_value::<Target::KeyColumn, u32>(i as u32).unwrap()
+                            }, encoded_idx);
+
+        if begin == end {
+            Ok(None)
+        } else {
+            assert!(end == begin + 1);
+            Ok(Some(target_table.get_row(begin as u32)?))
+        }
     }
 }
