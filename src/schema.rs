@@ -137,6 +137,20 @@ macro_rules! coded_index {
                 }
             }
         }
+
+        impl<'db> crate::AssemblyInfo for $name<'db> {
+            fn get_assembly(&self) -> Option<Assembly> {
+                match self {
+                    $($name::$ty(r) => r.get_assembly()),+
+                }
+            }
+
+            fn assembly_name(&self) -> Option<&str> {
+                match self {
+                    $($name::$ty(r) => r.assembly_name()),+
+                }
+            }
+        }
     }
 }
 
