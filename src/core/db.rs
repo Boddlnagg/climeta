@@ -550,7 +550,7 @@ impl<'db> Database<'db> {
     }
 }
 
-impl<'db> crate::AssemblyInfo for Database<'db> {
+impl<'db> crate::AssemblyAccess for Database<'db> {
     fn get_assembly(&self) -> Option<schema::Assembly> {
         let table = self.get_table::<schema::Assembly>();
         if table.len() > 0 {

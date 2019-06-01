@@ -354,6 +354,14 @@ impl<'db> Type<'db> {
             _ => return Err("Unexpected element type for Type".into())
         })
     }
+
+    pub fn contains_generic_var(&self) -> bool {
+        match self {
+            Type::Ref(_, _, Some(generic)) => generic.iter().any(|t| t.contains_generic_var()),
+            Type::GenericVar(..) => true,
+            _ => false
+        }
+    }
 }
 
 fn parse_generic_inst<'db>(cur: &mut &'db [u8], db: &'db Database) -> Result<(TypeTag, TypeDefOrRef<'db>, Box<[Type<'db>]>)> {

@@ -27,7 +27,7 @@ macro_rules! row_type {
         }
 
         
-        impl<'db> crate::AssemblyInfo for $ty<'db> {
+        impl<'db> crate::AssemblyAccess for $ty<'db> {
             fn get_assembly(&self) -> Option<schema::Assembly> {
                 self.0.m_table.db.get_assembly()
             }
@@ -208,6 +208,29 @@ impl<'db> CustomAttribute<'db> {
                 }?;
                 CustomAttributeSig::parse(blob, self.0.m_table.db, cache, &method_sig)
             }
+        }
+    }
+}
+
+impl<'db> ResolveToTypeDef<'db> for CustomAttribute<'db> {
+    fn namespace_name_pair(&self) -> (&'db str, &'db str) {
+        fn inner<'db>(ca: &CustomAttribute<'db>) -> Result<(&'db str, &'db str)> {
+            let ctor = ca.type_()?;
+            Ok(match ctor {
+                super::CustomAttributeType::MemberRef(ref mr) => {
+                    match mr.class()? {
+                        super::MemberRefParent::TypeDef(ref td) => td.namespace_name_pair(),
+                        super::MemberRefParent::TypeRef(ref tr) => tr.namespace_name_pair(),
+                        _ => return Err("A CustomAttribute MemberRef should only be a TypeDef or TypeRef".into())
+                    }
+                },
+                super::CustomAttributeType::MethodDef(ref md) => unimplemented!() // md.parent()?.namespace_name_pair()
+            })
+        }
+
+        match inner(self) {
+            Ok(result) => result,
+            Err(_) => ("", "")
         }
     }
 }
@@ -557,6 +580,17 @@ impl<'db> TypeDef<'db> {
 
     pub fn custom_attributes(&self) -> Result<TableRowIterator<'db, marker::CustomAttribute>> {
         self.0.get_list_by_key::<marker::CustomAttribute>(super::HasCustomAttribute::encode(self))
+    }
+
+    // TODO: implement this for each type that has custom attributes (maybe via trait and blanket impl?)
+    pub fn get_attribute(&self, type_namespace: &str, type_name: &str) -> Result<Option<CustomAttribute>> {
+        for attr in self.custom_attributes()? {
+            let pair = attr.namespace_name_pair();
+            if pair == (type_namespace, type_name) {
+                return Ok(Some(attr));
+            }
+        }
+        Ok(None)
     }
 }
 

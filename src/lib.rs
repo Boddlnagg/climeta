@@ -209,12 +209,12 @@ impl<'db> Database<'db> {
     }
 }
 
-pub trait AssemblyInfo {
+pub trait AssemblyAccess {
     fn get_assembly(&self) -> Option<schema::Assembly>;
     fn assembly_name(&self) -> Option<&str>;
 }
 
-impl<'db> AssemblyInfo for Database<'db> {
+impl<'db> AssemblyAccess for Database<'db> {
     fn get_assembly(&self) -> Option<schema::Assembly> {
         self.0.get_assembly()
     }

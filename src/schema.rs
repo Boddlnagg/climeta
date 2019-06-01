@@ -138,7 +138,7 @@ macro_rules! coded_index {
             }
         }
 
-        impl<'db> crate::AssemblyInfo for $name<'db> {
+        impl<'db> crate::AssemblyAccess for $name<'db> {
             fn get_assembly(&self) -> Option<Assembly> {
                 match self {
                     $($name::$ty(r) => r.get_assembly()),+
