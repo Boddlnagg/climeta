@@ -325,3 +325,9 @@ impl<'db> ResolveToTypeDef<'db> for &'db str {
         }
     }
 }
+
+impl<'db> ResolveToTypeDef<'db> for (&'db str, &'db str) {
+    fn namespace_name_pair(&self) -> (&'db str, &'db str) {
+        *self
+    }
+}
