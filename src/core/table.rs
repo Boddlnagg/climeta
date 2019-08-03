@@ -125,10 +125,17 @@ pub(crate) struct Row<'db, T: TableKind> {
     m_row: u32,
 }
 
+#[derive(Clone)]
 pub struct TableRowIterator<'db, T: TableKind> {
     m_table: Table<'db, T>,
     m_row: u32, // the next row to yield
     m_end: u32, // end of this iterator's range (exclusive)
+}
+
+impl<'db, T: TableKind> TableRowIterator<'db, T> {
+    pub fn is_empty(&self) -> bool {
+        self.m_row >= self.m_end
+    }
 }
 
 impl<'db, T: TableKind> Iterator for TableRowIterator<'db, T>

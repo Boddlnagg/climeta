@@ -89,6 +89,7 @@ impl From<DecodeError> for LoadDatabaseError {
 type Result<T> = std::result::Result<T, DecodeError>;
 
 pub use crate::core::table::Table;
+pub use crate::core::table::TableRowIterator;
 
 struct StableMmap(Mmap);
 
