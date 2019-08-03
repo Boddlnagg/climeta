@@ -351,6 +351,26 @@ impl<'db> fmt::Debug for PrimitiveValue {
     }
 }
 
+impl<'db> fmt::Display for PrimitiveValue {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use PrimitiveValue::*;
+        match self {
+            Boolean(v) => write!(f, "{}", v),
+            Char(v) => write!(f, "{}", v),
+            Int8(v) => write!(f, "{}", v),
+            UInt8(v) => write!(f, "{}", v),
+            Int16(v) => write!(f, "{}", v),
+            UInt16(v) => write!(f, "{}", v),
+            Int32(v) => write!(f, "{}", v),
+            UInt32(v) => write!(f, "{}", v),
+            Int64(v) => write!(f, "{}", v),
+            UInt64(v) => write!(f, "{}", v),
+            Float32(v) => write!(f, "{}", v),
+            Float64(v) => write!(f, "{}", v)
+        }
+    }
+}
+
 // ECMA-335, II.16.2
 #[derive(Copy, Clone, PartialEq)]
 pub enum FieldInit<'db> {
