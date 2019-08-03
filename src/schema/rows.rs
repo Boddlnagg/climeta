@@ -402,8 +402,23 @@ impl<'db> MethodDef<'db> {
         self.0.get_list::<Col5, marker::Param>()
     }
 
+    pub fn generic_params(&self) -> Result<TableRowIterator<'db, marker::GenericParam>> {
+        self.0.get_list_by_key::<marker::GenericParam>(super::TypeOrMethodDef::encode(self))
+    }
+
     pub fn custom_attributes(&self) -> Result<TableRowIterator<'db, marker::CustomAttribute>> {
         self.0.get_list_by_key::<marker::CustomAttribute>(super::HasCustomAttribute::encode(self))
+    }
+
+    // TODO: implement this for each type that has custom attributes (maybe via trait and blanket impl?)
+    pub fn get_attribute(&self, type_namespace: &str, type_name: &str) -> Result<Option<CustomAttribute>> {
+        for attr in self.custom_attributes()? {
+            let pair = attr.namespace_name_pair();
+            if pair == (type_namespace, type_name) {
+                return Ok(Some(attr));
+            }
+        }
+        Ok(None)
     }
 }
 
@@ -576,6 +591,10 @@ impl<'db> TypeDef<'db> {
             Err(_) => false,
             Ok(f) => f.semantics() == TypeSemantics::Interface
         }
+    }
+
+    pub fn generic_params(&self) -> Result<TableRowIterator<'db, marker::GenericParam>> {
+        self.0.get_list_by_key::<marker::GenericParam>(super::TypeOrMethodDef::encode(self))
     }
 
     pub fn custom_attributes(&self) -> Result<TableRowIterator<'db, marker::CustomAttribute>> {
