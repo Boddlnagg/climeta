@@ -1,0 +1,6 @@
+trailing_comma = "Never"
+overflow_delimited_expr = true
+use_try_shorthand = true
+fn_single_line = true
+fn_args_density = "Compressed"
+match_block_trailing_comma = true

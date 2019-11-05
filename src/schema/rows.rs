@@ -95,6 +95,16 @@ impl<'db> Assembly<'db> {
     pub fn custom_attributes(&self) -> Result<TableRowIterator<'db, marker::CustomAttribute>> {
         self.0.get_list_by_key::<marker::CustomAttribute>(super::HasCustomAttribute::encode(self))
     }
+
+    // TODO: implement this for each type that has custom attributes (maybe via trait and blanket impl?)
+    pub fn get_attribute(&self, type_namespace: &str, type_name: &str) -> Result<Option<CustomAttribute>> {
+        for attr in self.custom_attributes()? {
+            if attr.namespace_name_pair() == (type_namespace, type_name) {
+                return Ok(Some(attr));
+            }
+        }
+        Ok(None)
+    }
 }
 
 // ECMA-335, II.22.3
@@ -127,6 +137,16 @@ impl<'db> AssemblyRef<'db> {
 
     pub fn custom_attributes(&self) -> Result<TableRowIterator<'db, marker::CustomAttribute>> {
         self.0.get_list_by_key::<marker::CustomAttribute>(super::HasCustomAttribute::encode(self))
+    }
+
+    // TODO: implement this for each type that has custom attributes (maybe via trait and blanket impl?)
+    pub fn get_attribute(&self, type_namespace: &str, type_name: &str) -> Result<Option<CustomAttribute>> {
+        for attr in self.custom_attributes()? {
+            if attr.namespace_name_pair() == (type_namespace, type_name) {
+                return Ok(Some(attr));
+            }
+        }
+        Ok(None)
     }
 }
 
@@ -254,12 +274,32 @@ impl<'db> Event<'db> {
     pub fn custom_attributes(&self) -> Result<TableRowIterator<'db, marker::CustomAttribute>> {
         self.0.get_list_by_key::<marker::CustomAttribute>(super::HasCustomAttribute::encode(self))
     }
+
+    // TODO: implement this for each type that has custom attributes (maybe via trait and blanket impl?)
+    pub fn get_attribute(&self, type_namespace: &str, type_name: &str) -> Result<Option<CustomAttribute>> {
+        for attr in self.custom_attributes()? {
+            if attr.namespace_name_pair() == (type_namespace, type_name) {
+                return Ok(Some(attr));
+            }
+        }
+        Ok(None)
+    }
 }
 
 // ECMA-335, II.22.14
 impl<'db> ExportedType<'db> {
     pub fn custom_attributes(&self) -> Result<TableRowIterator<'db, marker::CustomAttribute>> {
         self.0.get_list_by_key::<marker::CustomAttribute>(super::HasCustomAttribute::encode(self))
+    }
+
+    // TODO: implement this for each type that has custom attributes (maybe via trait and blanket impl?)
+    pub fn get_attribute(&self, type_namespace: &str, type_name: &str) -> Result<Option<CustomAttribute>> {
+        for attr in self.custom_attributes()? {
+            if attr.namespace_name_pair() == (type_namespace, type_name) {
+                return Ok(Some(attr));
+            }
+        }
+        Ok(None)
     }
 }
 
@@ -284,6 +324,16 @@ impl<'db> Field<'db> {
     pub fn custom_attributes(&self) -> Result<TableRowIterator<'db, marker::CustomAttribute>> {
         self.0.get_list_by_key::<marker::CustomAttribute>(super::HasCustomAttribute::encode(self))
     }
+
+    // TODO: implement this for each type that has custom attributes (maybe via trait and blanket impl?)
+    pub fn get_attribute(&self, type_namespace: &str, type_name: &str) -> Result<Option<CustomAttribute>> {
+        for attr in self.custom_attributes()? {
+            if attr.namespace_name_pair() == (type_namespace, type_name) {
+                return Ok(Some(attr));
+            }
+        }
+        Ok(None)
+    }
 }
 
 // ECMA-335, II.22.16
@@ -305,6 +355,16 @@ impl<'db> FieldRVA<'db> {
 impl<'db> File<'db> {
     pub fn custom_attributes(&self) -> Result<TableRowIterator<'db, marker::CustomAttribute>> {
         self.0.get_list_by_key::<marker::CustomAttribute>(super::HasCustomAttribute::encode(self))
+    }
+
+    // TODO: implement this for each type that has custom attributes (maybe via trait and blanket impl?)
+    pub fn get_attribute(&self, type_namespace: &str, type_name: &str) -> Result<Option<CustomAttribute>> {
+        for attr in self.custom_attributes()? {
+            if attr.namespace_name_pair() == (type_namespace, type_name) {
+                return Ok(Some(attr));
+            }
+        }
+        Ok(None)
     }
 }
 
@@ -329,12 +389,32 @@ impl<'db> GenericParam<'db> {
     pub fn custom_attributes(&self) -> Result<TableRowIterator<'db, marker::CustomAttribute>> {
         self.0.get_list_by_key::<marker::CustomAttribute>(super::HasCustomAttribute::encode(self))
     }
+
+    // TODO: implement this for each type that has custom attributes (maybe via trait and blanket impl?)
+    pub fn get_attribute(&self, type_namespace: &str, type_name: &str) -> Result<Option<CustomAttribute>> {
+        for attr in self.custom_attributes()? {
+            if attr.namespace_name_pair() == (type_namespace, type_name) {
+                return Ok(Some(attr));
+            }
+        }
+        Ok(None)
+    }
 }
 
 // ECMA-335, II.22.21
 impl<'db> GenericParamConstraint<'db> {
     pub fn custom_attributes(&self) -> Result<TableRowIterator<'db, marker::CustomAttribute>> {
         self.0.get_list_by_key::<marker::CustomAttribute>(super::HasCustomAttribute::encode(self))
+    }
+
+    // TODO: implement this for each type that has custom attributes (maybe via trait and blanket impl?)
+    pub fn get_attribute(&self, type_namespace: &str, type_name: &str) -> Result<Option<CustomAttribute>> {
+        for attr in self.custom_attributes()? {
+            if attr.namespace_name_pair() == (type_namespace, type_name) {
+                return Ok(Some(attr));
+            }
+        }
+        Ok(None)
     }
 }
 
@@ -345,8 +425,26 @@ impl<'db> ImplMap<'db> {
 
 // ECMA-335, II.22.23
 impl<'db> InterfaceImpl<'db> {
+    pub fn class(&self) -> Result<TypeDef<'db>> {
+        self.0.get_target_row::<Col0, marker::TypeDef>()
+    }
+
+    pub fn interface(&self) -> Result<super::TypeDefOrRef<'db>> {
+        Ok(self.0.get_coded_index::<Col1, super::TypeDefOrRef>()?.expect("InterfaceImpl Interface column must not be NULL"))
+    }
+
     pub fn custom_attributes(&self) -> Result<TableRowIterator<'db, marker::CustomAttribute>> {
         self.0.get_list_by_key::<marker::CustomAttribute>(super::HasCustomAttribute::encode(self))
+    }
+
+    // TODO: implement this for each type that has custom attributes (maybe via trait and blanket impl?)
+    pub fn get_attribute(&self, type_namespace: &str, type_name: &str) -> Result<Option<CustomAttribute>> {
+        for attr in self.custom_attributes()? {
+            if attr.namespace_name_pair() == (type_namespace, type_name) {
+                return Ok(Some(attr));
+            }
+        }
+        Ok(None)
     }
 }
 
@@ -354,6 +452,16 @@ impl<'db> InterfaceImpl<'db> {
 impl<'db> ManifestResource<'db> {
     pub fn custom_attributes(&self) -> Result<TableRowIterator<'db, marker::CustomAttribute>> {
         self.0.get_list_by_key::<marker::CustomAttribute>(super::HasCustomAttribute::encode(self))
+    }
+
+    // TODO: implement this for each type that has custom attributes (maybe via trait and blanket impl?)
+    pub fn get_attribute(&self, type_namespace: &str, type_name: &str) -> Result<Option<CustomAttribute>> {
+        for attr in self.custom_attributes()? {
+            if attr.namespace_name_pair() == (type_namespace, type_name) {
+                return Ok(Some(attr));
+            }
+        }
+        Ok(None)
     }
 }
 
@@ -374,6 +482,16 @@ impl<'db> MemberRef<'db> {
 
     pub fn custom_attributes(&self) -> Result<TableRowIterator<'db, marker::CustomAttribute>> {
         self.0.get_list_by_key::<marker::CustomAttribute>(super::HasCustomAttribute::encode(self))
+    }
+
+    // TODO: implement this for each type that has custom attributes (maybe via trait and blanket impl?)
+    pub fn get_attribute(&self, type_namespace: &str, type_name: &str) -> Result<Option<CustomAttribute>> {
+        for attr in self.custom_attributes()? {
+            if attr.namespace_name_pair() == (type_namespace, type_name) {
+                return Ok(Some(attr));
+            }
+        }
+        Ok(None)
     }
 }
 
@@ -413,8 +531,7 @@ impl<'db> MethodDef<'db> {
     // TODO: implement this for each type that has custom attributes (maybe via trait and blanket impl?)
     pub fn get_attribute(&self, type_namespace: &str, type_name: &str) -> Result<Option<CustomAttribute>> {
         for attr in self.custom_attributes()? {
-            let pair = attr.namespace_name_pair();
-            if pair == (type_namespace, type_name) {
+            if attr.namespace_name_pair() == (type_namespace, type_name) {
                 return Ok(Some(attr));
             }
         }
@@ -447,6 +564,16 @@ impl<'db> MethodSpec<'db> {
     pub fn custom_attributes(&self) -> Result<TableRowIterator<'db, marker::CustomAttribute>> {
         self.0.get_list_by_key::<marker::CustomAttribute>(super::HasCustomAttribute::encode(self))
     }
+
+    // TODO: implement this for each type that has custom attributes (maybe via trait and blanket impl?)
+    pub fn get_attribute(&self, type_namespace: &str, type_name: &str) -> Result<Option<CustomAttribute>> {
+        for attr in self.custom_attributes()? {
+            if attr.namespace_name_pair() == (type_namespace, type_name) {
+                return Ok(Some(attr));
+            }
+        }
+        Ok(None)
+    }
 }
 
 // ECMA-335, II.22.30
@@ -458,12 +585,32 @@ impl<'db> Module<'db> {
     pub fn custom_attributes(&self) -> Result<TableRowIterator<'db, marker::CustomAttribute>> {
         self.0.get_list_by_key::<marker::CustomAttribute>(super::HasCustomAttribute::encode(self))
     }
+
+    // TODO: implement this for each type that has custom attributes (maybe via trait and blanket impl?)
+    pub fn get_attribute(&self, type_namespace: &str, type_name: &str) -> Result<Option<CustomAttribute>> {
+        for attr in self.custom_attributes()? {
+            if attr.namespace_name_pair() == (type_namespace, type_name) {
+                return Ok(Some(attr));
+            }
+        }
+        Ok(None)
+    }
 }
 
 // ECMA-335, II.22.31
 impl<'db> ModuleRef<'db> {
     pub fn custom_attributes(&self) -> Result<TableRowIterator<'db, marker::CustomAttribute>> {
         self.0.get_list_by_key::<marker::CustomAttribute>(super::HasCustomAttribute::encode(self))
+    }
+
+    // TODO: implement this for each type that has custom attributes (maybe via trait and blanket impl?)
+    pub fn get_attribute(&self, type_namespace: &str, type_name: &str) -> Result<Option<CustomAttribute>> {
+        for attr in self.custom_attributes()? {
+            if attr.namespace_name_pair() == (type_namespace, type_name) {
+                return Ok(Some(attr));
+            }
+        }
+        Ok(None)
     }
 }
 
@@ -490,6 +637,16 @@ impl<'db> Param<'db> {
     pub fn custom_attributes(&self) -> Result<TableRowIterator<'db, marker::CustomAttribute>> {
         self.0.get_list_by_key::<marker::CustomAttribute>(super::HasCustomAttribute::encode(self))
     }
+
+    // TODO: implement this for each type that has custom attributes (maybe via trait and blanket impl?)
+    pub fn get_attribute(&self, type_namespace: &str, type_name: &str) -> Result<Option<CustomAttribute>> {
+        for attr in self.custom_attributes()? {
+            if attr.namespace_name_pair() == (type_namespace, type_name) {
+                return Ok(Some(attr));
+            }
+        }
+        Ok(None)
+    }
 }
 
 // ECMA-335, II.22.34
@@ -500,6 +657,16 @@ impl<'db> Property<'db> {
 
     pub fn custom_attributes(&self) -> Result<TableRowIterator<'db, marker::CustomAttribute>> {
         self.0.get_list_by_key::<marker::CustomAttribute>(super::HasCustomAttribute::encode(self))
+    }
+
+    // TODO: implement this for each type that has custom attributes (maybe via trait and blanket impl?)
+    pub fn get_attribute(&self, type_namespace: &str, type_name: &str) -> Result<Option<CustomAttribute>> {
+        for attr in self.custom_attributes()? {
+            if attr.namespace_name_pair() == (type_namespace, type_name) {
+                return Ok(Some(attr));
+            }
+        }
+        Ok(None)
     }
 }
 
@@ -512,6 +679,16 @@ impl<'db> PropertyMap<'db> {
 impl<'db> StandAloneSig<'db> {
     pub fn custom_attributes(&self) -> Result<TableRowIterator<'db, marker::CustomAttribute>> {
         self.0.get_list_by_key::<marker::CustomAttribute>(super::HasCustomAttribute::encode(self))
+    }
+
+    // TODO: implement this for each type that has custom attributes (maybe via trait and blanket impl?)
+    pub fn get_attribute(&self, type_namespace: &str, type_name: &str) -> Result<Option<CustomAttribute>> {
+        for attr in self.custom_attributes()? {
+            if attr.namespace_name_pair() == (type_namespace, type_name) {
+                return Ok(Some(attr));
+            }
+        }
+        Ok(None)
     }
 }
 
@@ -597,6 +774,10 @@ impl<'db> TypeDef<'db> {
         self.0.get_list_by_key::<marker::GenericParam>(super::TypeOrMethodDef::encode(self))
     }
 
+    pub fn interface_impls(&self) -> Result<TableRowIterator<'db, marker::InterfaceImpl>> {
+        self.0.get_list_by_key::<marker::InterfaceImpl>(self.0.get_index() + 1)
+    }
+
     pub fn custom_attributes(&self) -> Result<TableRowIterator<'db, marker::CustomAttribute>> {
         self.0.get_list_by_key::<marker::CustomAttribute>(super::HasCustomAttribute::encode(self))
     }
@@ -604,8 +785,7 @@ impl<'db> TypeDef<'db> {
     // TODO: implement this for each type that has custom attributes (maybe via trait and blanket impl?)
     pub fn get_attribute(&self, type_namespace: &str, type_name: &str) -> Result<Option<CustomAttribute>> {
         for attr in self.custom_attributes()? {
-            let pair = attr.namespace_name_pair();
-            if pair == (type_namespace, type_name) {
+            if attr.namespace_name_pair() == (type_namespace, type_name) {
                 return Ok(Some(attr));
             }
         }
@@ -650,6 +830,16 @@ impl<'db> TypeRef<'db> {
     pub fn custom_attributes(&self) -> Result<TableRowIterator<'db, marker::CustomAttribute>> {
         self.0.get_list_by_key::<marker::CustomAttribute>(super::HasCustomAttribute::encode(self))
     }
+
+    // TODO: implement this for each type that has custom attributes (maybe via trait and blanket impl?)
+    pub fn get_attribute(&self, type_namespace: &str, type_name: &str) -> Result<Option<CustomAttribute>> {
+        for attr in self.custom_attributes()? {
+            if attr.namespace_name_pair() == (type_namespace, type_name) {
+                return Ok(Some(attr));
+            }
+        }
+        Ok(None)
+    }
 }
 
 impl<'db> ResolveToTypeDef<'db> for TypeRef<'db> {
@@ -676,5 +866,15 @@ impl<'db> TypeSpec<'db> {
 
     pub fn custom_attributes(&self) -> Result<TableRowIterator<'db, marker::CustomAttribute>> {
         self.0.get_list_by_key::<marker::CustomAttribute>(super::HasCustomAttribute::encode(self))
+    }
+
+    // TODO: implement this for each type that has custom attributes (maybe via trait and blanket impl?)
+    pub fn get_attribute(&self, type_namespace: &str, type_name: &str) -> Result<Option<CustomAttribute>> {
+        for attr in self.custom_attributes()? {
+            if attr.namespace_name_pair() == (type_namespace, type_name) {
+                return Ok(Some(attr));
+            }
+        }
+        Ok(None)
     }
 }

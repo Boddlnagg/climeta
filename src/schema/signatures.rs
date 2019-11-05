@@ -588,13 +588,14 @@ impl<'db> CustomMod<'db> {
 #[derive(Clone)]
 pub enum TypeSpecSig<'db> {
     GenericInst(TypeTag, TypeDefOrRef<'db>, Box<[Type<'db>]>)
+    // TODO: more missing (e.g. arrays)
 }
 
 impl<'db> TypeSpecSig<'db> {
     pub(crate) fn parse(cur: &mut &'db [u8], db: &'db Database) -> Result<TypeSpecSig<'db>> {
         let element_type = uncompress_unsigned(cur)?;
         match element_type as u8 {
-            bits::ELEMENT_TYPE_PTR | 
+            bits::ELEMENT_TYPE_PTR |
             bits::ELEMENT_TYPE_FNPTR |
             bits::ELEMENT_TYPE_ARRAY |
             bits::ELEMENT_TYPE_SZARRAY => unimplemented!(),

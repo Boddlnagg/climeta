@@ -3,7 +3,7 @@ ECMA-335 CLI metadata reader library for Rust.
 
 Based in part on the `meta_reader` implementation of https://github.com/Microsoft/xlang (C++).
 
-This is very much work in progress.
+TODO: Docs
 
 ## License
 

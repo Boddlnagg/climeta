@@ -282,7 +282,7 @@ impl<'db> ResolveToTypeDef<'db> for TypeDefOrRef<'db> {
         match self {
             TypeDefOrRef::TypeDef(d) => d.namespace_name_pair(),
             TypeDefOrRef::TypeRef(r) => r.namespace_name_pair(),
-            TypeDefOrRef::TypeSpec(_s) => panic!("TypeSpec has no namespace/name pair"),
+            TypeDefOrRef::TypeSpec(s) => panic!("TypeSpec '{:?}' has no namespace/name pair", s.signature().unwrap()),
         }
     }
 
@@ -290,7 +290,7 @@ impl<'db> ResolveToTypeDef<'db> for TypeDefOrRef<'db> {
         match self {
             TypeDefOrRef::TypeDef(d) => Some(d.clone()),
             TypeDefOrRef::TypeRef(r) => r.resolve(cache),
-            TypeDefOrRef::TypeSpec(_s) => panic!("TypeSpec cannot be resolved to TypeDef"),
+            TypeDefOrRef::TypeSpec(s) => panic!("TypeSpec '{:?}' cannot be resolved to TypeDef", s.signature().unwrap()),
         }
     }
 }
